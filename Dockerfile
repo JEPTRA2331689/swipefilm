@@ -4,7 +4,7 @@ WORKDIR /src
 
 COPY . .
 
-RUN dotnet restore swipefilm/swipefilm/swipefilm/swipefilm.csproj
+RUN dotnet restore swipefilm/swipefilm/swipefilm.csproj
 
 RUN dotnet publish \
     swipefilm/swipefilm/swipefilm/swipefilm.csproj \
