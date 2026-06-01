@@ -1,6 +1,7 @@
 ﻿using Microsoft.EntityFrameworkCore;
 using swipefilm.Data;
 using swipefilm.Models;
+
 namespace swipefilm.Auth
 {
     public class RecommendationEngine
@@ -23,19 +24,16 @@ namespace swipefilm.Auth
             var profile = await GetOrCreateProfileAsync(userId);
             var excluded = await GetExcludedMoviesAsync(userId, context);
             var available = await GetAvailableMoviesAsync(serverId);
-
-            // Pondérations dynamiques selon maturité du profil
             var weights = ComputeDynamicWeights(profile);
 
             var candidates = await _db.Movies
                 .Where(m => !excluded.Contains(m.TmdbId)
-                         && m.CachedAt != DateTime.MinValue) // Films enrichis seulement
+                         && m.CachedAt != DateTime.MinValue)
                 .ToListAsync();
 
             var scored = candidates
                 .Select(m => new ScoredMovie(
-                    m,
-                    ComputeScore(m, profile, available, context, weights)))
+                    m, ComputeScore(m, profile, available, context, weights)))
                 .ToList();
 
             return ApplyDiscoveryMix(scored, count, context);
@@ -45,25 +43,15 @@ namespace swipefilm.Auth
 
         private AlgoWeights ComputeDynamicWeights(UserProfile profile)
         {
-            // Maturité = combien de signaux on a sur le profil (0 à 1)
             var maturity = Math.Min(profile.TotalSignals / 50f, 1f);
 
             return new AlgoWeights
             {
-                // Historique : monte progressivement avec la maturité
-                History = 0.10f + (0.25f * maturity),   // 10% → 35%
-
-                // Content-based : stable mais diminue légèrement
-                ContentBased = 0.30f - (0.05f * maturity),  // 30% → 25%
-
-                // Collaboratif TMDB : reste stable
+                History = 0.10f + (0.25f * maturity),
+                ContentBased = 0.30f - (0.05f * maturity),
                 Collaborative = 0.20f,
-
-                // Popularité : forte au début, diminue avec la maturité
-                Popularity = 0.30f - (0.20f * maturity),   // 30% → 10%
-
-                // Disponible : reste stable
-                Available = 0.05f + (0.05f * maturity)    // 5% → 10%
+                Popularity = 0.30f - (0.20f * maturity),
+                Available = 0.05f + (0.05f * maturity)
             };
         }
 
@@ -83,41 +71,36 @@ namespace swipefilm.Auth
                 + w.Popularity * NormalizeRating(movie.TmdbRating)
                 + w.Available * (available.Contains(movie.TmdbId) ? 1f : 0f);
 
-            // Pénalité si film très obscur et profil immature
             if (movie.TmdbPopularity < 5f && profile.TotalSignals < 10)
                 score *= 0.5f;
 
             return Math.Clamp(score * GetContextMultiplier(movie, context), 0f, 1f);
         }
 
-        // ─── Score historique (corrigé) ───────────────────────────────
+        // ─── Score historique ─────────────────────────────────────────
 
         private float ComputeHistoryScore(Movie movie, UserProfile profile)
         {
             if (!profile.GenreWeights.Any()) return 0f;
 
-            // Genres — moyenne pondérée
             float genreScore = movie.Genres.Any()
                 ? movie.Genres
                     .Select(g => profile.GenreWeights.GetValueOrDefault(g, 0f))
                     .Average()
                 : 0f;
 
-            // Réalisateur — signal fort si connu
             float directorScore = movie.Directors.Any()
                 ? movie.Directors
                     .Select(d => profile.DirectorWeights.GetValueOrDefault(d, 0f))
                     .Max()
                 : 0f;
 
-            // Acteurs — moyenne top 5
             float actorScore = movie.CastTop5.Any()
                 ? movie.CastTop5
                     .Select(a => profile.ActorWeights.GetValueOrDefault(a, 0f))
                     .Average()
                 : 0f;
 
-            // Keywords — bonus si correspondance
             float keywordScore = movie.Keywords.Any()
                 ? movie.Keywords
                     .Select(k => profile.KeywordWeights.GetValueOrDefault(k, 0f))
@@ -131,22 +114,17 @@ namespace swipefilm.Auth
                  + (keywordScore * 0.15f);
         }
 
-        // ─── Score content-based (corrigé) ───────────────────────────
+        // ─── Score content-based ──────────────────────────────────────
 
         private float ComputeContentScore(Movie movie, UserProfile profile)
         {
             if (!profile.GenreWeights.Any()) return 0f;
 
-            // Similarité cosinus sur genres + keywords combinés
-            var movieVector = movie.Genres
-                .ToDictionary(g => g, _ => 1f);
+            var movieVector = movie.Genres.ToDictionary(g => g, _ => 1f);
 
-            // Ajoute les keywords avec poids réduit
             foreach (var kw in movie.Keywords)
-            {
                 if (!movieVector.ContainsKey(kw))
                     movieVector[kw] = 0.5f;
-            }
 
             var profileVector = profile.GenreWeights
                 .Concat(profile.KeywordWeights
@@ -158,36 +136,27 @@ namespace swipefilm.Auth
 
         // ─── Modificateur contextuel ──────────────────────────────────
 
-        private float GetContextMultiplier(
-            Movie movie, RecommendationContext context)
+        private float GetContextMultiplier(Movie movie, RecommendationContext context)
         {
             return context switch
             {
                 RecommendationContext.Evening =>
                     movie.RuntimeMinutes <= 100 ? 1.3f :
                     movie.RuntimeMinutes <= 130 ? 1.0f : 0.7f,
-
                 RecommendationContext.Discovery =>
                     movie.TmdbPopularity < 10 ? 1.5f :
                     movie.TmdbPopularity < 30 ? 1.2f : 0.8f,
-
-                RecommendationContext.Roulette => 1f,
-
                 _ => 1f
             };
         }
 
-        // ─── Mix découverte (amélioré) ────────────────────────────────
+        // ─── Mix découverte ───────────────────────────────────────────
 
         private List<ScoredMovie> ApplyDiscoveryMix(
-            List<ScoredMovie> scored,
-            int count,
-            RecommendationContext context)
+            List<ScoredMovie> scored, int count, RecommendationContext context)
         {
             var sorted = scored.OrderByDescending(s => s.Score).ToList();
 
-            // En mode Discovery → 40% aléatoire
-            // En mode Solo/Evening → 15% aléatoire
             float discoveryRatio = context == RecommendationContext.Discovery
                 ? 0.40f : 0.15f;
 
@@ -200,8 +169,6 @@ namespace swipefilm.Auth
                 .Take(randomCount)
                 .ToList();
 
-            // Intercale les films de découverte entre les top
-            // plutôt que les mettre tous à la fin
             var result = new List<ScoredMovie>();
             int discoveryInterval = topCount / Math.Max(randomCount, 1);
             int restIdx = 0;
@@ -209,37 +176,30 @@ namespace swipefilm.Auth
             for (int i = 0; i < top.Count; i++)
             {
                 result.Add(top[i]);
-                if (restIdx < rest.Count
-                    && i > 0
-                    && i % discoveryInterval == 0)
-                {
+                if (restIdx < rest.Count && i > 0 && i % discoveryInterval == 0)
                     result.Add(rest[restIdx++]);
-                }
             }
 
-            // Ajouter les restants
             while (restIdx < rest.Count)
                 result.Add(rest[restIdx++]);
 
             return result.Take(count).ToList();
         }
 
-        // ─── Mise à jour profil (optimisée) ──────────────────────────
+        // ─── Mise à jour profil incrémentale (par swipe) ─────────────
 
-        public async Task UpdateProfileAsync(Guid userId, Guid movieId,
-            SwipeDirection direction, int durationMs)
+        public async Task UpdateProfileAsync(
+            Guid userId, Guid movieId, SwipeDirection direction, int durationMs)
         {
             var profile = await GetOrCreateProfileAsync(userId);
             var movie = await _db.Movies.FindAsync(movieId);
 
             if (movie is null) return;
 
-            // Signal selon direction + vitesse du swipe
             float signal = direction == SwipeDirection.Right
-                ? durationMs < 1500 ? 0.9f : 0.7f   // Rapide = très sûr
-                : durationMs < 1500 ? -0.3f : -0.1f; // Gauche rapide = dégoût fort
+                ? durationMs < 1500 ? 0.9f : 0.7f
+                : durationMs < 1500 ? -0.3f : -0.1f;
 
-            // Mise à jour incrémentale — pas de rechargement complet
             UpdateWeightsIncremental(movie.Genres, signal, profile.GenreWeights);
             UpdateWeightsIncremental(movie.Directors, signal, profile.DirectorWeights);
             UpdateWeightsIncremental(movie.CastTop5, signal, profile.ActorWeights);
@@ -251,18 +211,32 @@ namespace swipefilm.Auth
             await _db.SaveChangesAsync();
         }
 
+        // ─── Mise à jour profil complète (historique + swipes) ────────
+
         public async Task UpdateProfileFromHistoryAsync(Guid userId)
         {
             var profile = await GetOrCreateProfileAsync(userId);
 
+            // Reset complet avant de recalculer
+            profile.GenreWeights = new Dictionary<string, float>();
+            profile.DirectorWeights = new Dictionary<string, float>();
+            profile.ActorWeights = new Dictionary<string, float>();
+            profile.KeywordWeights = new Dictionary<string, float>();
+            profile.TotalSignals = 0;
+
+            // ✅ Historique de visionnage
             var history = await _db.WatchHistory
                 .Include(w => w.Movie)
                 .Where(w => w.UserId == userId && w.Movie != null)
                 .ToListAsync();
 
+            Console.WriteLine($"[Profile] {history.Count} items dans l'historique");
+
             foreach (var w in history)
             {
-                var completionPct = w.Movie!.RuntimeMinutes > 0
+                if (w.Movie is null) continue;
+
+                var completionPct = w.Movie.RuntimeMinutes > 0
                     ? (float)w.WatchDurationSec
                         / (w.Movie.RuntimeMinutes!.Value * 60) * 100f
                     : 50f;
@@ -278,7 +252,6 @@ namespace swipefilm.Auth
 
                 if (w.UserRating.HasValue)
                     signal = (signal + (w.UserRating.Value - 5f) / 5f) / 2f;
-
                 if (w.IsFavorite) signal = MathF.Min(signal + 0.2f, 1f);
                 if (w.ViewCount > 1) signal = MathF.Min(signal + 0.15f * (w.ViewCount - 1), 1f);
 
@@ -286,10 +259,33 @@ namespace swipefilm.Auth
                 UpdateWeightsIncremental(w.Movie.Directors, signal, profile.DirectorWeights);
                 UpdateWeightsIncremental(w.Movie.CastTop5, signal, profile.ActorWeights);
                 UpdateWeightsIncremental(w.Movie.Keywords, signal, profile.KeywordWeights);
-
                 profile.TotalSignals++;
             }
 
+            // ✅ Swipes — signal plus fort car intention explicite
+            var swipes = await _db.Swipes
+                .Include(s => s.Movie)
+                .Where(s => s.UserId == userId && s.Movie != null)
+                .ToListAsync();
+
+            Console.WriteLine($"[Profile] {swipes.Count} swipes trouvés");
+
+            foreach (var swipe in swipes)
+            {
+                if (swipe.Movie is null) continue;
+
+                float signal = swipe.Direction == SwipeDirection.Right
+                    ? swipe.DurationMs < 1500 ? 0.9f : 0.7f
+                    : swipe.DurationMs < 1500 ? -0.5f : -0.3f;
+
+                UpdateWeightsIncremental(swipe.Movie.Genres, signal, profile.GenreWeights);
+                UpdateWeightsIncremental(swipe.Movie.Directors, signal, profile.DirectorWeights);
+                UpdateWeightsIncremental(swipe.Movie.CastTop5, signal, profile.ActorWeights);
+                UpdateWeightsIncremental(swipe.Movie.Keywords, signal, profile.KeywordWeights);
+                profile.TotalSignals++;
+            }
+
+            // Normalise tout
             profile.GenreWeights = Normalize(profile.GenreWeights);
             profile.DirectorWeights = Normalize(profile.DirectorWeights);
             profile.ActorWeights = Normalize(profile.ActorWeights);
@@ -297,14 +293,20 @@ namespace swipefilm.Auth
             profile.UpdatedAt = DateTime.UtcNow;
 
             await _db.SaveChangesAsync();
+
+            Console.WriteLine($"[Profile] TotalSignals: {profile.TotalSignals}");
+            Console.WriteLine($"[Profile] Top genres: {string.Join(", ",
+                profile.GenreWeights
+                    .OrderByDescending(g => g.Value)
+                    .Take(5)
+                    .Select(g => $"{g.Key}:{g.Value:F2}"))}");
         }
 
-        // ─── Exclusions (corrigé) ─────────────────────────────────────
+        // ─── Exclusions ───────────────────────────────────────────────
 
         private async Task<HashSet<int>> GetExcludedMoviesAsync(
             Guid userId, RecommendationContext context)
         {
-            // Swipes gauche récents (7 jours seulement, pas 30)
             var leftSwipes = await _db.Swipes
                 .Include(s => s.Movie)
                 .Where(s => s.UserId == userId
@@ -313,14 +315,13 @@ namespace swipefilm.Auth
                 .Select(s => s.Movie.TmdbId)
                 .ToListAsync();
 
-            // Films vus à +90% → exclus sauf en mode Roulette
             var watched = await _db.WatchHistory
                 .Include(w => w.Movie)
                 .Where(w => w.UserId == userId)
                 .ToListAsync();
 
             var watchedIds = context == RecommendationContext.Roulette
-                ? new List<int>() // En roulette → tout est possible
+                ? new List<int>()
                 : watched
                     .Where(w => w.Movie?.RuntimeMinutes > 0 &&
                         (float)w.WatchDurationSec /
@@ -328,7 +329,6 @@ namespace swipefilm.Auth
                     .Select(w => w.Movie!.TmdbId)
                     .ToList();
 
-            // Swipes droits récents (3 jours) → dans la watchlist, pas besoin de revoir
             var rightSwipes = await _db.Swipes
                 .Include(s => s.Movie)
                 .Where(s => s.UserId == userId
@@ -343,47 +343,33 @@ namespace swipefilm.Auth
                 .ToHashSet();
         }
 
-        // ─── Disponibilité (corrigé) ──────────────────────────────────
+        // ─── Disponibilité ────────────────────────────────────────────
 
         private async Task<HashSet<int>> GetAvailableMoviesAsync(Guid serverId)
         {
             var list = await _db.Movies
                 .Where(m => _db.WatchHistory
-                    .Any(w => w.ServerId == serverId
-                           && w.MovieId == m.Id))
+                    .Any(w => w.ServerId == serverId && w.MovieId == m.Id))
                 .Select(m => m.TmdbId)
                 .ToListAsync();
             return list.ToHashSet();
-
         }
 
         // ─── Helpers ──────────────────────────────────────────────────
 
         private void UpdateWeightsIncremental(
-            string[] items,
-            float signal,
-            Dictionary<string, float> weights)
+            string[] items, float signal, Dictionary<string, float> weights)
         {
             foreach (var item in items)
             {
                 if (string.IsNullOrEmpty(item)) continue;
-
-                if (weights.TryGetValue(item, out var current))
-                {
-                    // EMA (Exponential Moving Average) — alpha = 0.3
-                    // Donne plus de poids aux signaux récents
-                    // sans effacer les anciens
-                    weights[item] = (0.3f * signal) + (0.7f * current);
-                }
-                else
-                {
-                    weights[item] = signal;
-                }
+                weights[item] = weights.TryGetValue(item, out var current)
+                    ? (0.3f * signal) + (0.7f * current)
+                    : signal;
             }
         }
 
-        private Dictionary<string, float> Normalize(
-            Dictionary<string, float> weights)
+        private Dictionary<string, float> Normalize(Dictionary<string, float> weights)
         {
             if (!weights.Any()) return weights;
             var max = weights.Values.Max();
@@ -392,8 +378,7 @@ namespace swipefilm.Auth
         }
 
         private float CosineSimilarity(
-            Dictionary<string, float> a,
-            Dictionary<string, float> b)
+            Dictionary<string, float> a, Dictionary<string, float> b)
         {
             var common = a.Keys.Intersect(b.Keys).ToList();
             if (!common.Any()) return 0f;
