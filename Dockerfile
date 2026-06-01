@@ -7,7 +7,7 @@ COPY . .
 RUN dotnet restore swipefilm/swipefilm/swipefilm.csproj
 
 RUN dotnet publish \
-    swipefilm/swipefilm/swipefilm/swipefilm.csproj \
+    swipefilm/swipefilm/swipefilm.csproj \
     -c Release \
     -o /app/publish
 
