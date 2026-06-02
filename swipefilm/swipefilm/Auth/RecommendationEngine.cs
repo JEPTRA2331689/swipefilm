@@ -292,9 +292,49 @@ namespace swipefilm.Auth
             profile.KeywordWeights = Normalize(profile.KeywordWeights);
             profile.UpdatedAt = DateTime.UtcNow;
 
+            // ✅ Calcul PreferredMinYear et PreferredRuntimeMax
+            var likedMovies = new List<Movie>();
+
+            // Films bien regardés dans l'historique (70%+)
+            foreach (var w in history)
+            {
+                if (w.Movie?.RuntimeMinutes is null) continue;
+                var pct = w.Movie.RuntimeMinutes > 0
+                    ? (float)w.WatchDurationSec / (w.Movie.RuntimeMinutes.Value * 60) * 100f
+                    : 0f;
+                if (pct >= 70f) likedMovies.Add(w.Movie);
+            }
+
+            // Films swipés à droite
+            foreach (var swipe in swipes.Where(s => s.Direction == SwipeDirection.Right))
+                if (swipe.Movie is not null)
+                    likedMovies.Add(swipe.Movie);
+
+            if (likedMovies.Any())
+            {
+                var years = likedMovies
+                    .Where(m => m.ReleaseDate.HasValue)
+                    .Select(m => (float)m.ReleaseDate!.Value.Year)
+                    .ToList();
+
+                if (years.Any())
+                    profile.PreferredMinYear = years.Average() - 15f;
+
+                var runtimes = likedMovies
+                    .Where(m => m.RuntimeMinutes.HasValue && m.RuntimeMinutes > 0)
+                    .Select(m => (float)m.RuntimeMinutes!.Value)
+                    .ToList();
+
+                if (runtimes.Any())
+                    profile.PreferredRuntimeMax = runtimes.Average();
+            }
+
+            profile.UpdatedAt = DateTime.UtcNow;
             await _db.SaveChangesAsync();
 
             Console.WriteLine($"[Profile] TotalSignals: {profile.TotalSignals}");
+            Console.WriteLine($"[Profile] PreferredMinYear: {profile.PreferredMinYear}");
+            Console.WriteLine($"[Profile] PreferredRuntimeMax: {profile.PreferredRuntimeMax} min");
             Console.WriteLine($"[Profile] Top genres: {string.Join(", ",
                 profile.GenreWeights
                     .OrderByDescending(g => g.Value)
