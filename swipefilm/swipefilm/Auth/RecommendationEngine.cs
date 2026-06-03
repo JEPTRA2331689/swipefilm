@@ -111,9 +111,9 @@ namespace swipefilm.Auth
             score += yearScore * 0.05f;
             score += runtimeScore * 0.05f;
 
+            float finalScore = score * GetContextMultiplier(movie, context);
 
-
-            return Math.Clamp(score * GetContextMultiplier(movie, context), 0f, 1f);
+            return Math.Clamp(finalScore, 0f, 1f);
         }
 
         // ─── Score historique ─────────────────────────────────────────
@@ -232,7 +232,10 @@ namespace swipefilm.Auth
             int randomCount = count - topCount;
 
             var top = sorted.Take(topCount).ToList();
-            var rest = sorted.Skip(topCount)
+
+            var potentialDiscoveryPool = sorted.Skip(topCount).Take(150).ToList();
+            
+            var rest = potentialDiscoveryPool
                 .OrderBy(_ => Random.Shared.Next())
                 .Take(randomCount)
                 .ToList();

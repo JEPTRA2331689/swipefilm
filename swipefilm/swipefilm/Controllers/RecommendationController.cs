@@ -3,7 +3,6 @@ using System.Security.Claims;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using swipefilm.Auth;
-using swipefilm.Auth;
 
 namespace swipefilm.Controllers
 {
