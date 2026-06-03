@@ -28,10 +28,10 @@ namespace swipefilm.Controllers
             [FromQuery] RecommendationContext context = RecommendationContext.Solo,
             [FromQuery] int count = 20)
         {
-            var recommendations = await _engine
+            var (movies, available) = await _engine
                 .GetRecommendationsAsync(CurrentUserId, serverId, context, count);
 
-            return Ok(recommendations.Select(r => new
+            return Ok(movies.Select(r => new
             {
                 r.Movie.Id,
                 r.Movie.TmdbId,
@@ -42,6 +42,8 @@ namespace swipefilm.Controllers
                 r.Movie.RuntimeMinutes,
                 r.Movie.Genres,
                 r.Movie.ReleaseDate,
+                r.Movie.ContentType,
+                IsAvailable = available.Contains(r.Movie.TmdbId),
                 Score = Math.Round(r.Score, 3)
             }));
         }

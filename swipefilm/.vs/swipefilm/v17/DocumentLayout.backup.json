@@ -3,16 +3,12 @@
   "WorkspaceRootPath": "C:\\Users\\jephtance\\Desktop\\swipefilm\\swipefilm\\",
   "Documents": [
     {
+      "AbsoluteMoniker": "D:0:0:{F5928BA4-B0FA-4562-8BFE-BAF783C6B2B0}|swipefilm\\swipefilm.csproj|c:\\users\\jephtance\\desktop\\swipefilm\\swipefilm\\swipefilm\\swipefilm.csproj||{FA3CD31E-987B-443A-9B81-186104E8DAC1}|",
+      "RelativeMoniker": "D:0:0:{F5928BA4-B0FA-4562-8BFE-BAF783C6B2B0}|swipefilm\\swipefilm.csproj|solutionrelative:swipefilm\\swipefilm.csproj||{FA3CD31E-987B-443A-9B81-186104E8DAC1}|"
+    },
+    {
       "AbsoluteMoniker": "D:0:0:{F5928BA4-B0FA-4562-8BFE-BAF783C6B2B0}|swipefilm\\swipefilm.csproj|c:\\users\\jephtance\\desktop\\swipefilm\\swipefilm\\swipefilm\\auth\\recommendationengine.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
       "RelativeMoniker": "D:0:0:{F5928BA4-B0FA-4562-8BFE-BAF783C6B2B0}|swipefilm\\swipefilm.csproj|solutionrelative:swipefilm\\auth\\recommendationengine.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
-    },
-    {
-      "AbsoluteMoniker": "D:0:0:{F5928BA4-B0FA-4562-8BFE-BAF783C6B2B0}|swipefilm\\swipefilm.csproj|c:\\users\\jephtance\\desktop\\swipefilm\\swipefilm\\swipefilm\\program.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
-      "RelativeMoniker": "D:0:0:{F5928BA4-B0FA-4562-8BFE-BAF783C6B2B0}|swipefilm\\swipefilm.csproj|solutionrelative:swipefilm\\program.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
-    },
-    {
-      "AbsoluteMoniker": "D:0:0:{F5928BA4-B0FA-4562-8BFE-BAF783C6B2B0}|swipefilm\\swipefilm.csproj|c:\\users\\jephtance\\desktop\\swipefilm\\swipefilm\\swipefilm\\controllers\\synccontroller.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
-      "RelativeMoniker": "D:0:0:{F5928BA4-B0FA-4562-8BFE-BAF783C6B2B0}|swipefilm\\swipefilm.csproj|solutionrelative:swipefilm\\controllers\\synccontroller.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
     },
     {
       "AbsoluteMoniker": "D:0:0:{F5928BA4-B0FA-4562-8BFE-BAF783C6B2B0}|swipefilm\\swipefilm.csproj|c:\\users\\jephtance\\desktop\\swipefilm\\swipefilm\\swipefilm\\auth\\syncbackgroundservice.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
@@ -21,6 +17,22 @@
     {
       "AbsoluteMoniker": "D:0:0:{F5928BA4-B0FA-4562-8BFE-BAF783C6B2B0}|swipefilm\\swipefilm.csproj|c:\\users\\jephtance\\desktop\\swipefilm\\swipefilm\\swipefilm\\auth\\syncservice.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
       "RelativeMoniker": "D:0:0:{F5928BA4-B0FA-4562-8BFE-BAF783C6B2B0}|swipefilm\\swipefilm.csproj|solutionrelative:swipefilm\\auth\\syncservice.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{F5928BA4-B0FA-4562-8BFE-BAF783C6B2B0}|swipefilm\\swipefilm.csproj|c:\\users\\jephtance\\desktop\\swipefilm\\swipefilm\\swipefilm\\controllers\\synccontroller.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{F5928BA4-B0FA-4562-8BFE-BAF783C6B2B0}|swipefilm\\swipefilm.csproj|solutionrelative:swipefilm\\controllers\\synccontroller.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{F5928BA4-B0FA-4562-8BFE-BAF783C6B2B0}|swipefilm\\swipefilm.csproj|c:\\users\\jephtance\\desktop\\swipefilm\\swipefilm\\swipefilm\\controllers\\userservercontroller.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{F5928BA4-B0FA-4562-8BFE-BAF783C6B2B0}|swipefilm\\swipefilm.csproj|solutionrelative:swipefilm\\controllers\\userservercontroller.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{F5928BA4-B0FA-4562-8BFE-BAF783C6B2B0}|swipefilm\\swipefilm.csproj|c:\\users\\jephtance\\desktop\\swipefilm\\swipefilm\\swipefilm\\controllers\\weatherforecastcontroller.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{F5928BA4-B0FA-4562-8BFE-BAF783C6B2B0}|swipefilm\\swipefilm.csproj|solutionrelative:swipefilm\\controllers\\weatherforecastcontroller.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{F5928BA4-B0FA-4562-8BFE-BAF783C6B2B0}|swipefilm\\swipefilm.csproj|c:\\users\\jephtance\\desktop\\swipefilm\\swipefilm\\swipefilm\\program.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{F5928BA4-B0FA-4562-8BFE-BAF783C6B2B0}|swipefilm\\swipefilm.csproj|solutionrelative:swipefilm\\program.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
     },
     {
       "AbsoluteMoniker": "D:0:0:{F5928BA4-B0FA-4562-8BFE-BAF783C6B2B0}|swipefilm\\swipefilm.csproj|c:\\users\\jephtance\\desktop\\swipefilm\\swipefilm\\swipefilm\\auth\\personalizeddiscoveryservice.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
@@ -93,14 +105,6 @@
     {
       "AbsoluteMoniker": "D:0:0:{F5928BA4-B0FA-4562-8BFE-BAF783C6B2B0}|swipefilm\\swipefilm.csproj|c:\\users\\jephtance\\desktop\\swipefilm\\swipefilm\\swipefilm\\controllers\\tmdbcontroller.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
       "RelativeMoniker": "D:0:0:{F5928BA4-B0FA-4562-8BFE-BAF783C6B2B0}|swipefilm\\swipefilm.csproj|solutionrelative:swipefilm\\controllers\\tmdbcontroller.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
-    },
-    {
-      "AbsoluteMoniker": "D:0:0:{F5928BA4-B0FA-4562-8BFE-BAF783C6B2B0}|swipefilm\\swipefilm.csproj|c:\\users\\jephtance\\desktop\\swipefilm\\swipefilm\\swipefilm\\controllers\\userservercontroller.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
-      "RelativeMoniker": "D:0:0:{F5928BA4-B0FA-4562-8BFE-BAF783C6B2B0}|swipefilm\\swipefilm.csproj|solutionrelative:swipefilm\\controllers\\userservercontroller.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
-    },
-    {
-      "AbsoluteMoniker": "D:0:0:{F5928BA4-B0FA-4562-8BFE-BAF783C6B2B0}|swipefilm\\swipefilm.csproj|c:\\users\\jephtance\\desktop\\swipefilm\\swipefilm\\swipefilm\\controllers\\weatherforecastcontroller.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
-      "RelativeMoniker": "D:0:0:{F5928BA4-B0FA-4562-8BFE-BAF783C6B2B0}|swipefilm\\swipefilm.csproj|solutionrelative:swipefilm\\controllers\\weatherforecastcontroller.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
     },
     {
       "AbsoluteMoniker": "D:0:0:{F5928BA4-B0FA-4562-8BFE-BAF783C6B2B0}|swipefilm\\swipefilm.csproj|c:\\users\\jephtance\\desktop\\swipefilm\\swipefilm\\swipefilm\\models\\watchhistory.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
@@ -187,10 +191,6 @@
       "RelativeMoniker": "D:0:0:{F5928BA4-B0FA-4562-8BFE-BAF783C6B2B0}|swipefilm\\swipefilm.csproj|solutionrelative:swipefilm\\models\\sessionmatch.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
     },
     {
-      "AbsoluteMoniker": "D:0:0:{F5928BA4-B0FA-4562-8BFE-BAF783C6B2B0}|swipefilm\\swipefilm.csproj|c:\\users\\jephtance\\desktop\\swipefilm\\swipefilm\\swipefilm\\swipefilm.csproj||{FA3CD31E-987B-443A-9B81-186104E8DAC1}|",
-      "RelativeMoniker": "D:0:0:{F5928BA4-B0FA-4562-8BFE-BAF783C6B2B0}|swipefilm\\swipefilm.csproj|solutionrelative:swipefilm\\swipefilm.csproj||{FA3CD31E-987B-443A-9B81-186104E8DAC1}|"
-    },
-    {
       "AbsoluteMoniker": "D:0:0:{F5928BA4-B0FA-4562-8BFE-BAF783C6B2B0}|swipefilm\\swipefilm.csproj|c:\\users\\jephtance\\desktop\\swipefilm\\swipefilm\\swipefilm\\models\\session.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
       "RelativeMoniker": "D:0:0:{F5928BA4-B0FA-4562-8BFE-BAF783C6B2B0}|swipefilm\\swipefilm.csproj|solutionrelative:swipefilm\\models\\session.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
     },
@@ -227,31 +227,32 @@
             {
               "$type": "Document",
               "DocumentIndex": 3,
-              "Title": "SyncBackgroundService.cs",
-              "DocumentMoniker": "C:\\Users\\jephtance\\Desktop\\swipefilm\\swipefilm\\swipefilm\\Auth\\SyncBackgroundService.cs",
-              "RelativeDocumentMoniker": "swipefilm\\Auth\\SyncBackgroundService.cs",
-              "ToolTip": "C:\\Users\\jephtance\\Desktop\\swipefilm\\swipefilm\\swipefilm\\Auth\\SyncBackgroundService.cs",
-              "RelativeToolTip": "swipefilm\\Auth\\SyncBackgroundService.cs",
-              "ViewState": "AgIAABAAAAAAAAAAAAAIwC4AAABBAAAAAAAAAA==",
+              "Title": "SyncService.cs",
+              "DocumentMoniker": "C:\\Users\\jephtance\\Desktop\\swipefilm\\swipefilm\\swipefilm\\Auth\\SyncService.cs",
+              "RelativeDocumentMoniker": "swipefilm\\Auth\\SyncService.cs",
+              "ToolTip": "C:\\Users\\jephtance\\Desktop\\swipefilm\\swipefilm\\swipefilm\\Auth\\SyncService.cs",
+              "RelativeToolTip": "swipefilm\\Auth\\SyncService.cs",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
-              "WhenOpened": "2026-05-31T04:52:47.474Z"
-            },
-            {
-              "$type": "Document",
-              "DocumentIndex": 1,
-              "Title": "Program.cs",
-              "DocumentMoniker": "C:\\Users\\jephtance\\Desktop\\swipefilm\\swipefilm\\swipefilm\\Program.cs",
-              "RelativeDocumentMoniker": "swipefilm\\Program.cs",
-              "ToolTip": "C:\\Users\\jephtance\\Desktop\\swipefilm\\swipefilm\\swipefilm\\Program.cs",
-              "RelativeToolTip": "swipefilm\\Program.cs",
-              "ViewState": "AgIAAAAAAAAAAAAAAAAAAAwAAAAxAAAAAAAAAA==",
-              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
-              "WhenOpened": "2026-05-30T23:50:37.896Z",
+              "WhenOpened": "2026-05-31T04:52:02.309Z",
               "EditorCaption": ""
             },
             {
               "$type": "Document",
-              "DocumentIndex": 2,
+              "DocumentIndex": 5,
+              "Title": "UserServerController.cs",
+              "DocumentMoniker": "C:\\Users\\jephtance\\Desktop\\swipefilm\\swipefilm\\swipefilm\\Controllers\\UserServerController.cs",
+              "RelativeDocumentMoniker": "swipefilm\\Controllers\\UserServerController.cs",
+              "ToolTip": "C:\\Users\\jephtance\\Desktop\\swipefilm\\swipefilm\\swipefilm\\Controllers\\UserServerController.cs",
+              "RelativeToolTip": "swipefilm\\Controllers\\UserServerController.cs",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAAEMAAAAFAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2026-05-31T03:52:52.718Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 4,
               "Title": "SyncController.cs",
               "DocumentMoniker": "C:\\Users\\jephtance\\Desktop\\swipefilm\\swipefilm\\swipefilm\\Controllers\\SyncController.cs",
               "RelativeDocumentMoniker": "swipefilm\\Controllers\\SyncController.cs",
@@ -259,11 +260,64 @@
               "RelativeToolTip": "swipefilm\\Controllers\\SyncController.cs",
               "ViewState": "AgIAABwAAAAAAAAAAAAgwC8AAAAgAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
-              "WhenOpened": "2026-05-31T04:54:07.069Z"
+              "WhenOpened": "2026-05-31T04:54:07.069Z",
+              "EditorCaption": ""
             },
             {
               "$type": "Document",
-              "DocumentIndex": 5,
+              "DocumentIndex": 2,
+              "Title": "SyncBackgroundService.cs",
+              "DocumentMoniker": "C:\\Users\\jephtance\\Desktop\\swipefilm\\swipefilm\\swipefilm\\Auth\\SyncBackgroundService.cs",
+              "RelativeDocumentMoniker": "swipefilm\\Auth\\SyncBackgroundService.cs",
+              "ToolTip": "C:\\Users\\jephtance\\Desktop\\swipefilm\\swipefilm\\swipefilm\\Auth\\SyncBackgroundService.cs",
+              "RelativeToolTip": "swipefilm\\Auth\\SyncBackgroundService.cs",
+              "ViewState": "AgIAABAAAAAAAAAAAAAIwC4AAABBAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2026-05-31T04:52:47.474Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 1,
+              "Title": "RecommendationEngine.cs",
+              "DocumentMoniker": "C:\\Users\\jephtance\\Desktop\\swipefilm\\swipefilm\\swipefilm\\Auth\\RecommendationEngine.cs",
+              "RelativeDocumentMoniker": "swipefilm\\Auth\\RecommendationEngine.cs",
+              "ToolTip": "C:\\Users\\jephtance\\Desktop\\swipefilm\\swipefilm\\swipefilm\\Auth\\RecommendationEngine.cs",
+              "RelativeToolTip": "swipefilm\\Auth\\RecommendationEngine.cs",
+              "ViewState": "AgIAADsBAAAAAAAAAAAswFUBAAA+AAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2026-05-31T05:50:33.783Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 0,
+              "Title": "swipefilm.csproj",
+              "DocumentMoniker": "C:\\Users\\jephtance\\Desktop\\swipefilm\\swipefilm\\swipefilm\\swipefilm.csproj",
+              "RelativeDocumentMoniker": "swipefilm\\swipefilm.csproj",
+              "ToolTip": "C:\\Users\\jephtance\\Desktop\\swipefilm\\swipefilm\\swipefilm\\swipefilm.csproj",
+              "RelativeToolTip": "swipefilm\\swipefilm.csproj",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAABsAAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000758|",
+              "WhenOpened": "2026-05-30T23:49:36.49Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 6,
+              "Title": "WeatherForecastController.cs",
+              "DocumentMoniker": "C:\\Users\\jephtance\\Desktop\\swipefilm\\swipefilm\\swipefilm\\Controllers\\WeatherForecastController.cs",
+              "RelativeDocumentMoniker": "swipefilm\\Controllers\\WeatherForecastController.cs",
+              "ToolTip": "C:\\Users\\jephtance\\Desktop\\swipefilm\\swipefilm\\swipefilm\\Controllers\\WeatherForecastController.cs",
+              "RelativeToolTip": "swipefilm\\Controllers\\WeatherForecastController.cs",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2026-05-31T00:23:02.362Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 8,
               "Title": "PersonalizedDiscoveryService.cs",
               "DocumentMoniker": "C:\\Users\\jephtance\\Desktop\\swipefilm\\swipefilm\\swipefilm\\Auth\\PersonalizedDiscoveryService.cs",
               "RelativeDocumentMoniker": "swipefilm\\Auth\\PersonalizedDiscoveryService.cs",
@@ -275,32 +329,19 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 4,
-              "Title": "SyncService.cs",
-              "DocumentMoniker": "C:\\Users\\jephtance\\Desktop\\swipefilm\\swipefilm\\swipefilm\\Auth\\SyncService.cs",
-              "RelativeDocumentMoniker": "swipefilm\\Auth\\SyncService.cs",
-              "ToolTip": "C:\\Users\\jephtance\\Desktop\\swipefilm\\swipefilm\\swipefilm\\Auth\\SyncService.cs",
-              "RelativeToolTip": "swipefilm\\Auth\\SyncService.cs",
-              "ViewState": "AgIAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==",
+              "DocumentIndex": 7,
+              "Title": "Program.cs",
+              "DocumentMoniker": "C:\\Users\\jephtance\\Desktop\\swipefilm\\swipefilm\\swipefilm\\Program.cs",
+              "RelativeDocumentMoniker": "swipefilm\\Program.cs",
+              "ToolTip": "C:\\Users\\jephtance\\Desktop\\swipefilm\\swipefilm\\swipefilm\\Program.cs",
+              "RelativeToolTip": "swipefilm\\Program.cs",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAAAwAAAAxAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
-              "WhenOpened": "2026-05-31T04:52:02.309Z"
+              "WhenOpened": "2026-05-30T23:50:37.896Z"
             },
             {
               "$type": "Document",
-              "DocumentIndex": 0,
-              "Title": "RecommendationEngine.cs",
-              "DocumentMoniker": "C:\\Users\\jephtance\\Desktop\\swipefilm\\swipefilm\\swipefilm\\Auth\\RecommendationEngine.cs",
-              "RelativeDocumentMoniker": "swipefilm\\Auth\\RecommendationEngine.cs",
-              "ToolTip": "C:\\Users\\jephtance\\Desktop\\swipefilm\\swipefilm\\swipefilm\\Auth\\RecommendationEngine.cs",
-              "RelativeToolTip": "swipefilm\\Auth\\RecommendationEngine.cs",
-              "ViewState": "AgIAAAAAAAAAAAAAAAAAABoAAAA2AAAAAAAAAA==",
-              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
-              "WhenOpened": "2026-05-31T05:50:33.783Z",
-              "EditorCaption": ""
-            },
-            {
-              "$type": "Document",
-              "DocumentIndex": 6,
+              "DocumentIndex": 9,
               "Title": "HangfireAuthFilter.cs",
               "DocumentMoniker": "C:\\Users\\jephtance\\Desktop\\swipefilm\\swipefilm\\swipefilm\\Auth\\HangfireAuthFilter.cs",
               "RelativeDocumentMoniker": "swipefilm\\Auth\\HangfireAuthFilter.cs",
@@ -324,7 +365,7 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 8,
+              "DocumentIndex": 11,
               "Title": "RequestConfiguration.cs",
               "DocumentMoniker": "C:\\Users\\jephtance\\Desktop\\swipefilm\\swipefilm\\swipefilm\\Data\\Configurations\\RequestConfiguration.cs",
               "RelativeDocumentMoniker": "swipefilm\\Data\\Configurations\\RequestConfiguration.cs",
@@ -336,7 +377,7 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 9,
+              "DocumentIndex": 12,
               "Title": "UserServerConfiguration.cs",
               "DocumentMoniker": "C:\\Users\\jephtance\\Desktop\\swipefilm\\swipefilm\\swipefilm\\Data\\Configurations\\UserServerConfiguration.cs",
               "RelativeDocumentMoniker": "swipefilm\\Data\\Configurations\\UserServerConfiguration.cs",
@@ -348,7 +389,7 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 11,
+              "DocumentIndex": 14,
               "Title": "SwipeConfiguration.cs",
               "DocumentMoniker": "C:\\Users\\jephtance\\Desktop\\swipefilm\\swipefilm\\swipefilm\\Data\\Configurations\\SwipeConfiguration.cs",
               "RelativeDocumentMoniker": "swipefilm\\Data\\Configurations\\SwipeConfiguration.cs",
@@ -360,7 +401,7 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 12,
+              "DocumentIndex": 15,
               "Title": "WatchHistoryConfiguration.cs",
               "DocumentMoniker": "C:\\Users\\jephtance\\Desktop\\swipefilm\\swipefilm\\swipefilm\\Data\\Configurations\\WatchHistoryConfiguration.cs",
               "RelativeDocumentMoniker": "swipefilm\\Data\\Configurations\\WatchHistoryConfiguration.cs",
@@ -372,7 +413,7 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 7,
+              "DocumentIndex": 10,
               "Title": "UserProfileConfiguration.cs",
               "DocumentMoniker": "C:\\Users\\jephtance\\Desktop\\swipefilm\\swipefilm\\swipefilm\\Data\\Configurations\\UserProfileConfiguration.cs",
               "RelativeDocumentMoniker": "swipefilm\\Data\\Configurations\\UserProfileConfiguration.cs",
@@ -396,7 +437,7 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 16,
+              "DocumentIndex": 19,
               "Title": "TmdbService.cs",
               "DocumentMoniker": "C:\\Users\\jephtance\\Desktop\\swipefilm\\swipefilm\\swipefilm\\Auth\\TmdbService.cs",
               "RelativeDocumentMoniker": "swipefilm\\Auth\\TmdbService.cs",
@@ -408,7 +449,7 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 10,
+              "DocumentIndex": 13,
               "Title": "MovieConfiguration.cs",
               "DocumentMoniker": "C:\\Users\\jephtance\\Desktop\\swipefilm\\swipefilm\\swipefilm\\Data\\Configurations\\MovieConfiguration.cs",
               "RelativeDocumentMoniker": "swipefilm\\Data\\Configurations\\MovieConfiguration.cs",
@@ -420,7 +461,7 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 17,
+              "DocumentIndex": 20,
               "Title": "UserServerService.cs",
               "DocumentMoniker": "C:\\Users\\jephtance\\Desktop\\swipefilm\\swipefilm\\swipefilm\\Auth\\UserServerService.cs",
               "RelativeDocumentMoniker": "swipefilm\\Auth\\UserServerService.cs",
@@ -432,7 +473,7 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 13,
+              "DocumentIndex": 16,
               "Title": "IMediaServerService.cs",
               "DocumentMoniker": "C:\\Users\\jephtance\\Desktop\\swipefilm\\swipefilm\\swipefilm\\Auth\\IMediaServerService.cs",
               "RelativeDocumentMoniker": "swipefilm\\Auth\\IMediaServerService.cs",
@@ -444,7 +485,7 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 14,
+              "DocumentIndex": 17,
               "Title": "JellyfinService.cs",
               "DocumentMoniker": "C:\\Users\\jephtance\\Desktop\\swipefilm\\swipefilm\\swipefilm\\Auth\\JellyfinService.cs",
               "RelativeDocumentMoniker": "swipefilm\\Auth\\JellyfinService.cs",
@@ -456,7 +497,7 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 15,
+              "DocumentIndex": 18,
               "Title": "PlexService.cs",
               "DocumentMoniker": "C:\\Users\\jephtance\\Desktop\\swipefilm\\swipefilm\\swipefilm\\Auth\\PlexService.cs",
               "RelativeDocumentMoniker": "swipefilm\\Auth\\PlexService.cs",
@@ -468,7 +509,7 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 18,
+              "DocumentIndex": 21,
               "Title": "AuthController.cs",
               "DocumentMoniker": "C:\\Users\\jephtance\\Desktop\\swipefilm\\swipefilm\\swipefilm\\Controllers\\AuthController.cs",
               "RelativeDocumentMoniker": "swipefilm\\Controllers\\AuthController.cs",
@@ -480,7 +521,7 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 19,
+              "DocumentIndex": 22,
               "Title": "RecommendationController.cs",
               "DocumentMoniker": "C:\\Users\\jephtance\\Desktop\\swipefilm\\swipefilm\\swipefilm\\Controllers\\RecommendationController.cs",
               "RelativeDocumentMoniker": "swipefilm\\Controllers\\RecommendationController.cs",
@@ -492,7 +533,7 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 20,
+              "DocumentIndex": 23,
               "Title": "SeerrController.cs",
               "DocumentMoniker": "C:\\Users\\jephtance\\Desktop\\swipefilm\\swipefilm\\swipefilm\\Controllers\\SeerrController.cs",
               "RelativeDocumentMoniker": "swipefilm\\Controllers\\SeerrController.cs",
@@ -504,7 +545,7 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 21,
+              "DocumentIndex": 24,
               "Title": "SwipeController.cs.cs",
               "DocumentMoniker": "C:\\Users\\jephtance\\Desktop\\swipefilm\\swipefilm\\swipefilm\\Controllers\\SwipeController.cs.cs",
               "RelativeDocumentMoniker": "swipefilm\\Controllers\\SwipeController.cs.cs",
@@ -516,7 +557,7 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 22,
+              "DocumentIndex": 25,
               "Title": "TmdbController.cs",
               "DocumentMoniker": "C:\\Users\\jephtance\\Desktop\\swipefilm\\swipefilm\\swipefilm\\Controllers\\TmdbController.cs",
               "RelativeDocumentMoniker": "swipefilm\\Controllers\\TmdbController.cs",
@@ -528,31 +569,7 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 23,
-              "Title": "UserServerController.cs",
-              "DocumentMoniker": "C:\\Users\\jephtance\\Desktop\\swipefilm\\swipefilm\\swipefilm\\Controllers\\UserServerController.cs",
-              "RelativeDocumentMoniker": "swipefilm\\Controllers\\UserServerController.cs",
-              "ToolTip": "C:\\Users\\jephtance\\Desktop\\swipefilm\\swipefilm\\swipefilm\\Controllers\\UserServerController.cs",
-              "RelativeToolTip": "swipefilm\\Controllers\\UserServerController.cs",
-              "ViewState": "AgIAAAAAAAAAAAAAAAAAAEMAAAAFAAAAAAAAAA==",
-              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
-              "WhenOpened": "2026-05-31T03:52:52.718Z"
-            },
-            {
-              "$type": "Document",
-              "DocumentIndex": 24,
-              "Title": "WeatherForecastController.cs",
-              "DocumentMoniker": "C:\\Users\\jephtance\\Desktop\\swipefilm\\swipefilm\\swipefilm\\Controllers\\WeatherForecastController.cs",
-              "RelativeDocumentMoniker": "swipefilm\\Controllers\\WeatherForecastController.cs",
-              "ToolTip": "C:\\Users\\jephtance\\Desktop\\swipefilm\\swipefilm\\swipefilm\\Controllers\\WeatherForecastController.cs",
-              "RelativeToolTip": "swipefilm\\Controllers\\WeatherForecastController.cs",
-              "ViewState": "AgIAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==",
-              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
-              "WhenOpened": "2026-05-31T00:23:02.362Z"
-            },
-            {
-              "$type": "Document",
-              "DocumentIndex": 25,
+              "DocumentIndex": 26,
               "Title": "WatchHistory.cs",
               "DocumentMoniker": "C:\\Users\\jephtance\\Desktop\\swipefilm\\swipefilm\\swipefilm\\Models\\WatchHistory.cs",
               "RelativeDocumentMoniker": "swipefilm\\Models\\WatchHistory.cs",
@@ -564,7 +581,7 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 26,
+              "DocumentIndex": 27,
               "Title": "SeerrService.cs",
               "DocumentMoniker": "C:\\Users\\jephtance\\Desktop\\swipefilm\\swipefilm\\swipefilm\\Auth\\SeerrService.cs",
               "RelativeDocumentMoniker": "swipefilm\\Auth\\SeerrService.cs",
@@ -588,7 +605,7 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 30,
+              "DocumentIndex": 31,
               "Title": "appsettings.Development.json",
               "DocumentMoniker": "C:\\Users\\jephtance\\Desktop\\swipefilm\\swipefilm\\swipefilm\\appsettings.Development.json",
               "RelativeDocumentMoniker": "swipefilm\\appsettings.Development.json",
@@ -600,7 +617,7 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 27,
+              "DocumentIndex": 28,
               "Title": "UserProfile.cs",
               "DocumentMoniker": "C:\\Users\\jephtance\\Desktop\\swipefilm\\swipefilm\\swipefilm\\Models\\UserProfile.cs",
               "RelativeDocumentMoniker": "swipefilm\\Models\\UserProfile.cs",
@@ -612,7 +629,7 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 28,
+              "DocumentIndex": 29,
               "Title": "Request.cs",
               "DocumentMoniker": "C:\\Users\\jephtance\\Desktop\\swipefilm\\swipefilm\\swipefilm\\Models\\Request.cs",
               "RelativeDocumentMoniker": "swipefilm\\Models\\Request.cs",
@@ -624,7 +641,7 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 29,
+              "DocumentIndex": 30,
               "Title": "appsettings.json",
               "DocumentMoniker": "C:\\Users\\jephtance\\Desktop\\swipefilm\\swipefilm\\swipefilm\\appsettings.json",
               "RelativeDocumentMoniker": "swipefilm\\appsettings.json",
@@ -648,7 +665,7 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 31,
+              "DocumentIndex": 32,
               "Title": "User.cs",
               "DocumentMoniker": "C:\\Users\\jephtance\\Desktop\\swipefilm\\swipefilm\\swipefilm\\Models\\User.cs",
               "RelativeDocumentMoniker": "swipefilm\\Models\\User.cs",
@@ -660,7 +677,7 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 32,
+              "DocumentIndex": 33,
               "Title": "EncryptionService.cs",
               "DocumentMoniker": "C:\\Users\\jephtance\\Desktop\\swipefilm\\swipefilm\\swipefilm\\Auth\\EncryptionService.cs",
               "RelativeDocumentMoniker": "swipefilm\\Auth\\EncryptionService.cs",
@@ -672,7 +689,7 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 33,
+              "DocumentIndex": 34,
               "Title": "20260531034036_AddIdentity.cs",
               "DocumentMoniker": "C:\\Users\\jephtance\\Desktop\\swipefilm\\swipefilm\\swipefilm\\Migrations\\20260531034036_AddIdentity.cs",
               "RelativeDocumentMoniker": "swipefilm\\Migrations\\20260531034036_AddIdentity.cs",
@@ -684,7 +701,7 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 34,
+              "DocumentIndex": 35,
               "Title": "AuthManager.cs",
               "DocumentMoniker": "C:\\Users\\jephtance\\Desktop\\swipefilm\\swipefilm\\swipefilm\\Auth\\AuthManager.cs",
               "RelativeDocumentMoniker": "swipefilm\\Auth\\AuthManager.cs",
@@ -696,7 +713,7 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 36,
+              "DocumentIndex": 37,
               "Title": "20260531031519_InitialCreate.cs",
               "DocumentMoniker": "C:\\Users\\jephtance\\Desktop\\swipefilm\\swipefilm\\swipefilm\\Migrations\\20260531031519_InitialCreate.cs",
               "RelativeDocumentMoniker": "swipefilm\\Migrations\\20260531031519_InitialCreate.cs",
@@ -708,7 +725,7 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 35,
+              "DocumentIndex": 36,
               "Title": "AppDbContext.cs",
               "DocumentMoniker": "C:\\Users\\jephtance\\Desktop\\swipefilm\\swipefilm\\swipefilm\\Data\\AppDbContext.cs",
               "RelativeDocumentMoniker": "swipefilm\\Data\\AppDbContext.cs",
@@ -720,7 +737,7 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 37,
+              "DocumentIndex": 38,
               "Title": "Movie.cs",
               "DocumentMoniker": "C:\\Users\\jephtance\\Desktop\\swipefilm\\swipefilm\\swipefilm\\Models\\Movie.cs",
               "RelativeDocumentMoniker": "swipefilm\\Models\\Movie.cs",
@@ -732,7 +749,7 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 38,
+              "DocumentIndex": 39,
               "Title": "RefreshToken.cs",
               "DocumentMoniker": "C:\\Users\\jephtance\\Desktop\\swipefilm\\swipefilm\\swipefilm\\Models\\RefreshToken.cs",
               "RelativeDocumentMoniker": "swipefilm\\Models\\RefreshToken.cs",
@@ -744,7 +761,7 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 39,
+              "DocumentIndex": 40,
               "Title": "20260531012828_InitialCreate.cs",
               "DocumentMoniker": "C:\\Users\\jephtance\\Desktop\\swipefilm\\swipefilm\\swipefilm\\Migrations\\20260531012828_InitialCreate.cs",
               "RelativeDocumentMoniker": "swipefilm\\Migrations\\20260531012828_InitialCreate.cs",
@@ -756,7 +773,7 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 40,
+              "DocumentIndex": 41,
               "Title": "Watchlist.cs",
               "DocumentMoniker": "C:\\Users\\jephtance\\Desktop\\swipefilm\\swipefilm\\swipefilm\\Models\\Watchlist.cs",
               "RelativeDocumentMoniker": "swipefilm\\Models\\Watchlist.cs",
@@ -768,7 +785,7 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 41,
+              "DocumentIndex": 42,
               "Title": "UserServer.cs",
               "DocumentMoniker": "C:\\Users\\jephtance\\Desktop\\swipefilm\\swipefilm\\swipefilm\\Models\\UserServer.cs",
               "RelativeDocumentMoniker": "swipefilm\\Models\\UserServer.cs",
@@ -780,7 +797,7 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 42,
+              "DocumentIndex": 43,
               "Title": "UserSeerr.cs",
               "DocumentMoniker": "C:\\Users\\jephtance\\Desktop\\swipefilm\\swipefilm\\swipefilm\\Models\\UserSeerr.cs",
               "RelativeDocumentMoniker": "swipefilm\\Models\\UserSeerr.cs",
@@ -792,7 +809,7 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 43,
+              "DocumentIndex": 44,
               "Title": "Swipe.cs",
               "DocumentMoniker": "C:\\Users\\jephtance\\Desktop\\swipefilm\\swipefilm\\swipefilm\\Models\\Swipe.cs",
               "RelativeDocumentMoniker": "swipefilm\\Models\\Swipe.cs",
@@ -804,7 +821,7 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 44,
+              "DocumentIndex": 45,
               "Title": "SessionMember.cs",
               "DocumentMoniker": "C:\\Users\\jephtance\\Desktop\\swipefilm\\swipefilm\\swipefilm\\Models\\SessionMember.cs",
               "RelativeDocumentMoniker": "swipefilm\\Models\\SessionMember.cs",
@@ -816,7 +833,7 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 45,
+              "DocumentIndex": 46,
               "Title": "SessionMatch.cs",
               "DocumentMoniker": "C:\\Users\\jephtance\\Desktop\\swipefilm\\swipefilm\\swipefilm\\Models\\SessionMatch.cs",
               "RelativeDocumentMoniker": "swipefilm\\Models\\SessionMatch.cs",
@@ -837,18 +854,6 @@
               "ViewState": "AgIAAAAAAAAAAAAAAAAAABEAAAA8AAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
               "WhenOpened": "2026-05-31T00:29:02.412Z"
-            },
-            {
-              "$type": "Document",
-              "DocumentIndex": 46,
-              "Title": "swipefilm.csproj",
-              "DocumentMoniker": "C:\\Users\\jephtance\\Desktop\\swipefilm\\swipefilm\\swipefilm\\swipefilm.csproj",
-              "RelativeDocumentMoniker": "swipefilm\\swipefilm.csproj",
-              "ToolTip": "C:\\Users\\jephtance\\Desktop\\swipefilm\\swipefilm\\swipefilm\\swipefilm.csproj",
-              "RelativeToolTip": "swipefilm\\swipefilm.csproj",
-              "ViewState": "AgIAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==",
-              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000758|",
-              "WhenOpened": "2026-05-30T23:49:36.49Z"
             },
             {
               "$type": "Document",

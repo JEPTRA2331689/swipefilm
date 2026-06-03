@@ -15,8 +15,9 @@ namespace swipefilm.Auth
 
         // ─── Point d'entrée ───────────────────────────────────────────
 
-        public async Task<List<ScoredMovie>> GetRecommendationsAsync(
-            Guid userId,
+        public async Task<(List<ScoredMovie> movies, HashSet<int> available)>
+            GetRecommendationsAsync(
+                    Guid userId,
             Guid serverId,
             RecommendationContext context,
             int count = 20)
@@ -36,7 +37,7 @@ namespace swipefilm.Auth
                     m, ComputeScore(m, profile, available, context, weights)))
                 .ToList();
 
-            return ApplyDiscoveryMix(scored, count, context);
+            return (ApplyDiscoveryMix(scored, count, context), available);
         }
 
         // ─── Pondérations dynamiques ──────────────────────────────────
