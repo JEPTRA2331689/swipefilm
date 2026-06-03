@@ -14,7 +14,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("swipefilm")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+7cf5395af026689038346afd442bb8951ebaa024")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+eee63913e33757a585dc8b2748a7080fab136056")]
 [assembly: System.Reflection.AssemblyProductAttribute("swipefilm")]
 [assembly: System.Reflection.AssemblyTitleAttribute("swipefilm")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]

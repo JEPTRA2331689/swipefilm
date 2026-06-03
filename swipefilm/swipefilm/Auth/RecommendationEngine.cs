@@ -375,6 +375,9 @@ namespace swipefilm.Auth
                     : 0f;
                 if (pct >= 70f) likedMovies.Add(w.Movie);
             }
+            Console.WriteLine($"[Profile] Films avec genres: {history.Count(w => w.Movie?.Genres?.Any() == true)}");
+            Console.WriteLine($"[Profile] Films sans genres: {history.Count(w => w.Movie?.Genres?.Any() != true)}");
+
 
             // Films swipés à droite
             foreach (var swipe in swipes.Where(s => s.Direction == SwipeDirection.Right))
@@ -399,6 +402,10 @@ namespace swipefilm.Auth
                 if (runtimes.Any())
                     profile.PreferredRuntimeMax = runtimes.Average();
             }
+            // Après la boucle swipes
+            Console.WriteLine($"[Profile] Swipes avec genres: {swipes.Count(s => s.Movie?.Genres?.Any() == true)}");
+            Console.WriteLine($"[Profile] Swipes sans genres: {swipes.Count(s => s.Movie?.Genres?.Any() != true)}");
+
 
             profile.UpdatedAt = DateTime.UtcNow;
             await _db.SaveChangesAsync();
