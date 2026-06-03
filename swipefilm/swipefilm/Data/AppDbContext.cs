@@ -19,6 +19,7 @@ public class AppDbContext : IdentityDbContext<User, IdentityRole<Guid>, Guid>
     public DbSet<SessionMatch> SessionMatches => Set<SessionMatch>();
     public DbSet<Request> Requests => Set<Request>();
     public DbSet<UserProfile> UserProfiles => Set<UserProfile>();
+    public DbSet<ServerMovie> ServerMovie => Set<ServerMovie>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

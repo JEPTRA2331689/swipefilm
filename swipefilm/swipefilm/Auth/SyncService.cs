@@ -1,7 +1,6 @@
 ﻿using Microsoft.EntityFrameworkCore;
 using swipefilm.Data;
 using swipefilm.Models;
-using swipefilm.Auth;
 
 namespace swipefilm.Auth
 {
@@ -21,7 +20,7 @@ namespace swipefilm.Auth
         public async Task SyncServerAsync(
             UserServer server,
             IMediaServerService mediaService,
-            DateTime? since = null) // ← sync incrémentale
+            DateTime? since = null)
         {
             await SyncLibraryAsync(server, mediaService, since);
             await SyncWatchHistoryAsync(server, mediaService, since);
@@ -37,7 +36,6 @@ namespace swipefilm.Auth
             IMediaServerService mediaService,
             DateTime? since)
         {
-            // ✅ Sync incrémentale si possible
             List<MediaItem> items;
 
             if (since.HasValue && mediaService is JellyfinService jellyfin)
@@ -47,17 +45,38 @@ namespace swipefilm.Auth
             else
                 items = await mediaService.GetLibraryAsync(server.Id);
 
+            Console.WriteLine($"[Sync] Items reçus de Jellyfin/Plex: {items.Count}");
+
+
             if (!items.Any())
             {
                 Console.WriteLine("[Sync] Bibliothèque — aucun nouveau film");
                 return;
             }
 
-            // ✅ Une seule requête pour tous les TmdbIds existants
-            var existingSet = (await _db.Movies
+            var withTmdb = items.Count(i => i.TmdbId != null);
+            var withoutTmdb = items.Count(i => i.TmdbId == null);
+            Console.WriteLine($"[Sync] Avec TmdbId: {withTmdb}, Sans TmdbId: {withoutTmdb}");
+
+
+            // ✅ TmdbIds existants en une requête
+            var existingMovieTmdbIds = (await _db.Movies
                 .Select(m => m.TmdbId)
                 .ToListAsync())
                 .ToHashSet();
+
+            Console.WriteLine($"[Sync] Films déjà en BD: {existingMovieTmdbIds.Count}");
+
+
+            // ✅ ServerMovies existants pour ce serveur
+            var existingServerMovieIds = (await _db.ServerMovie
+                .Where(sm => sm.ServerId == server.Id)
+                .Select(sm => sm.MovieId)
+                .ToListAsync())
+                .ToHashSet();
+
+            Console.WriteLine($"[Sync] ServerMovies déjà en BD: {existingServerMovieIds.Count}");
+
 
             var newMovies = new List<Movie>();
 
@@ -67,7 +86,7 @@ namespace swipefilm.Auth
                     || !int.TryParse(item.TmdbId, out var tmdbId))
                     continue;
 
-                if (existingSet.Contains(tmdbId)) continue;
+                if (existingMovieTmdbIds.Contains(tmdbId)) continue;
 
                 newMovies.Add(new Movie
                 {
@@ -79,15 +98,56 @@ namespace swipefilm.Auth
                     CachedAt = DateTime.MinValue
                 });
 
-                existingSet.Add(tmdbId); // Évite les doublons dans le batch
+                existingMovieTmdbIds.Add(tmdbId);
             }
 
+            // ✅ Sauvegarde les nouveaux films d'abord
             if (newMovies.Any())
             {
-                // ✅ Batch insert — une seule transaction
                 _db.Movies.AddRange(newMovies);
                 await _db.SaveChangesAsync();
-                Console.WriteLine($"[Sync] Bibliothèque — {newMovies.Count} nouveaux films ajoutés");
+                Console.WriteLine($"[Sync] {newMovies.Count} nouveaux films ajoutés");
+            }
+
+            // ✅ Charge tous les films correspondants aux items reçus
+            var tmdbIdsFromItems = items
+                .Where(i => i.TmdbId != null)
+                .Select(i => int.Parse(i.TmdbId!))
+                .ToHashSet();
+
+            var allMovies = await _db.Movies
+                .Where(m => tmdbIdsFromItems.Contains(m.TmdbId))
+                .ToDictionaryAsync(m => m.TmdbId, m => m.Id);
+
+            // ✅ Ajoute les ServerMovies manquants
+            var newServerMovies = new List<ServerMovie>();
+
+            foreach (var item in items)
+            {
+                if (item.TmdbId is null
+                    || !int.TryParse(item.TmdbId, out var tmdbId))
+                    continue;
+
+                if (!allMovies.TryGetValue(tmdbId, out var movieId))
+                    continue;
+
+                if (existingServerMovieIds.Contains(movieId)) continue;
+
+                newServerMovies.Add(new ServerMovie
+                {
+                    Id = Guid.NewGuid(),
+                    ServerId = server.Id,
+                    MovieId = movieId,
+                });
+
+                existingServerMovieIds.Add(movieId);
+            }
+
+            if (newServerMovies.Any())
+            {
+                _db.ServerMovie.AddRange(newServerMovies);
+                await _db.SaveChangesAsync();
+                Console.WriteLine($"[Sync] {newServerMovies.Count} ServerMovies ajoutés");
             }
         }
 
@@ -98,7 +158,6 @@ namespace swipefilm.Auth
             IMediaServerService mediaService,
             DateTime? since)
         {
-            // ✅ Sync incrémentale si possible
             List<WatchHistoryItem> history;
 
             if (since.HasValue && mediaService is JellyfinService jellyfin)
@@ -112,18 +171,15 @@ namespace swipefilm.Auth
 
             if (!history.Any()) return;
 
-            // ✅ Une seule requête pour tous les films
             var allMovies = await _db.Movies
                 .ToDictionaryAsync(m => m.TmdbId, m => m);
 
-            // ✅ Une seule requête pour tout le WatchHistory existant
             var existingHistory = await _db.WatchHistory
                 .Where(w => w.UserId == server.UserId
                          && w.ServerId == server.Id)
                 .ToDictionaryAsync(w => w.MovieId, w => w);
 
             int added = 0, updated = 0, skipped = 0, unchanged = 0;
-
             var toAdd = new List<WatchHistory>();
 
             foreach (var item in history)
@@ -143,7 +199,6 @@ namespace swipefilm.Auth
 
                 if (existingHistory.TryGetValue(movie.Id, out var existing))
                 {
-                    // ✅ Hash — skip si rien n'a changé
                     if (existing.ContentHash is not null
                         && existing.ContentHash == item.ContentHash)
                     {
@@ -162,7 +217,6 @@ namespace swipefilm.Auth
                 }
                 else
                 {
-                    // ✅ Accumule les nouveaux dans une liste
                     toAdd.Add(new WatchHistory
                     {
                         Id = Guid.NewGuid(),
@@ -182,11 +236,9 @@ namespace swipefilm.Auth
                 }
             }
 
-            // ✅ Batch insert — une seule transaction pour tous les nouveaux
             if (toAdd.Any())
                 _db.WatchHistory.AddRange(toAdd);
 
-            // ✅ Une seule transaction pour tout
             await _db.SaveChangesAsync();
 
             Console.WriteLine(

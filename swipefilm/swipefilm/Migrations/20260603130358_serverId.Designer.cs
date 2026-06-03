@@ -3,6 +3,7 @@ using System;
 using System.Collections.Generic;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -11,9 +12,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace swipefilm.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    partial class AppDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260603130358_serverId")]
+    partial class serverId
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -358,9 +361,7 @@ namespace swipefilm.Migrations
 
                     b.HasIndex("MovieId");
 
-                    b.HasIndex("ServerId", "MovieId")
-                        .IsUnique()
-                        .HasDatabaseName("idx_servermovie_server_movie");
+                    b.HasIndex("ServerId");
 
                     b.ToTable("ServerMovie");
                 });
@@ -773,7 +774,7 @@ namespace swipefilm.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
-                    b.HasOne("swipefilm.Models.UserServer", "Server")
+                    b.HasOne("swipefilm.Models.UserProfile", "Server")
                         .WithMany()
                         .HasForeignKey("ServerId")
                         .OnDelete(DeleteBehavior.Cascade)

@@ -20,11 +20,12 @@ namespace swipefilm.Auth
                     Guid userId,
             Guid serverId,
             RecommendationContext context,
-            int count = 20)
+            int count = 20)     
         {
             var profile = await GetOrCreateProfileAsync(userId);
             var excluded = await GetExcludedMoviesAsync(userId, context);
             var available = await GetAvailableMoviesAsync(serverId);
+            Console.WriteLine($"Available count = {available.Count}");
             var weights = ComputeDynamicWeights(profile);
 
             var candidates = await _db.Movies
@@ -388,11 +389,10 @@ namespace swipefilm.Auth
 
         private async Task<HashSet<int>> GetAvailableMoviesAsync(Guid serverId)
         {
-            var list = await _db.Movies
-                .Where(m => _db.WatchHistory
-                    .Any(w => w.ServerId == serverId && w.MovieId == m.Id))
-                .Select(m => m.TmdbId)
-                .ToListAsync();
+            var list = await _db.ServerMovie
+                        .Where(x => x.ServerId == serverId)
+                        .Select(x => x.Movie.TmdbId)
+                        .ToListAsync();
             return list.ToHashSet();
         }
 
