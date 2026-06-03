@@ -20,7 +20,7 @@ namespace swipefilm.Auth
                     Guid userId,
             Guid serverId,
             RecommendationContext context,
-            int count = 20)     
+            int count = 20)
         {
             var profile = await GetOrCreateProfileAsync(userId);
             var excluded = await GetExcludedMoviesAsync(userId, context);
@@ -32,11 +32,10 @@ namespace swipefilm.Auth
                 .Where(m => !excluded.Contains(m.TmdbId)
                          && m.CachedAt != DateTime.MinValue)
                 .ToListAsync();
-            var collaborativeScores = await GetCollaborativeScores(userId);
 
             var scored = candidates
                 .Select(m => new ScoredMovie(
-                    m, ComputeScore(m, profile, available, context, weights, collaborativeScores)))
+                    m, ComputeScore(m, profile, available, context, weights)))
                 .ToList();
 
             return (ApplyDiscoveryMix(scored, count, context), available);
@@ -65,55 +64,19 @@ namespace swipefilm.Auth
             UserProfile profile,
             HashSet<int> available,
             RecommendationContext context,
-            AlgoWeights w,
-            Dictionary<int, float> collaborativeScores)
+            AlgoWeights w)
         {
-            var collaborative = collaborativeScores.GetValueOrDefault(movie.TmdbId, 0f);
-            float history = Math.Clamp(ComputeHistoryScore(movie, profile), 0f, 1f);
-            float content = Math.Clamp(ComputeContentScore(movie, profile), 0f, 1f);
-            float popularity = NormalizeRating(movie.TmdbRating);
-            float availableScore = available.Contains(movie.TmdbId) ? 1f : 0f;
-
-
             float score =
-              w.History * history
-            + w.ContentBased * content
-            + w.Collaborative * collaborative
-            + w.Popularity * popularity
-            + w.Available * availableScore;
+                  w.History * ComputeHistoryScore(movie, profile)
+                + w.ContentBased * ComputeContentScore(movie, profile)
+                + w.Collaborative * ComputePopularityScore(movie)
+                + w.Popularity * NormalizeRating(movie.TmdbRating)
+                + w.Available * (available.Contains(movie.TmdbId) ? 1f : 0f);
 
             if (movie.TmdbPopularity < 5f && profile.TotalSignals < 10)
                 score *= 0.5f;
-            float yearScore = 0f;
 
-            if (movie.ReleaseDate.HasValue)
-            {
-                var yearDiff =
-                    movie.ReleaseDate.Value.Year - profile.PreferredMinYear;
-
-                yearScore = Math.Clamp(yearDiff / 20f, 0f, 1f);
-            }
-
-            float runtimeScore = 0f;
-
-            if (movie.RuntimeMinutes.HasValue &&
-                profile.PreferredRuntimeMax > 0)
-            {
-                var diff =
-                    Math.Abs(
-                        movie.RuntimeMinutes.Value -
-                        profile.PreferredRuntimeMax);
-
-                runtimeScore =
-                    Math.Max(0f, 1f - diff / 120f);
-            }
-
-            score += yearScore * 0.05f;
-            score += runtimeScore * 0.05f;
-
-            float finalScore = score * GetContextMultiplier(movie, context);
-
-            return Math.Clamp(finalScore, 0f, 1f);
+            return Math.Clamp(score * GetContextMultiplier(movie, context), 0f, 1f);
         }
 
         // ─── Score historique ─────────────────────────────────────────
@@ -195,35 +158,6 @@ namespace swipefilm.Auth
             List<ScoredMovie> scored, int count, RecommendationContext context)
         {
             var sorted = scored.OrderByDescending(s => s.Score).ToList();
-            var selectedGenres = new Dictionary<string, int>();
-
-            for (int i = 0; i < sorted.Count; i++)
-            {
-                var item = sorted[i];
-
-                foreach (var genre in item.Movie.Genres)
-                {
-                    if (selectedGenres.TryGetValue(genre, out var count1))
-                    {
-                        item = item with
-                        {
-                            Score = item.Score * (1f - count1 * 0.05f)
-                        };
-                    }
-                }
-
-                sorted[i] = item;
-
-                foreach (var genre in item.Movie.Genres)
-                {
-                    selectedGenres[genre] =
-                        selectedGenres.GetValueOrDefault(genre) + 1;
-                }
-            }
-
-            sorted = sorted
-                .OrderByDescending(x => x.Score)
-                .ToList();
 
             float discoveryRatio = context == RecommendationContext.Discovery
                 ? 0.40f : 0.15f;
@@ -232,10 +166,7 @@ namespace swipefilm.Auth
             int randomCount = count - topCount;
 
             var top = sorted.Take(topCount).ToList();
-
-            var potentialDiscoveryPool = sorted.Skip(topCount).Take(150).ToList();
-            
-            var rest = potentialDiscoveryPool
+            var rest = sorted.Skip(topCount)
                 .OrderBy(_ => Random.Shared.Next())
                 .Take(randomCount)
                 .ToList();
@@ -375,9 +306,6 @@ namespace swipefilm.Auth
                     : 0f;
                 if (pct >= 70f) likedMovies.Add(w.Movie);
             }
-            Console.WriteLine($"[Profile] Films avec genres: {history.Count(w => w.Movie?.Genres?.Any() == true)}");
-            Console.WriteLine($"[Profile] Films sans genres: {history.Count(w => w.Movie?.Genres?.Any() != true)}");
-
 
             // Films swipés à droite
             foreach (var swipe in swipes.Where(s => s.Direction == SwipeDirection.Right))
@@ -402,10 +330,6 @@ namespace swipefilm.Auth
                 if (runtimes.Any())
                     profile.PreferredRuntimeMax = runtimes.Average();
             }
-            // Après la boucle swipes
-            Console.WriteLine($"[Profile] Swipes avec genres: {swipes.Count(s => s.Movie?.Genres?.Any() == true)}");
-            Console.WriteLine($"[Profile] Swipes sans genres: {swipes.Count(s => s.Movie?.Genres?.Any() != true)}");
-
 
             profile.UpdatedAt = DateTime.UtcNow;
             await _db.SaveChangesAsync();
@@ -430,7 +354,7 @@ namespace swipefilm.Auth
                 .Where(s => s.UserId == userId
                          && s.Direction == SwipeDirection.Left
                          && s.CreatedAt > DateTime.UtcNow.AddDays(-7))
-                .Select(s => s.Movie != null ? s.Movie.TmdbId : 0)
+                .Select(s => s.Movie.TmdbId)
                 .ToListAsync();
 
             var watched = await _db.WatchHistory
@@ -470,51 +394,6 @@ namespace swipefilm.Auth
                         .Select(x => x.Movie.TmdbId)
                         .ToListAsync();
             return list.ToHashSet();
-        }
-        private async Task<Dictionary<int, float>> GetCollaborativeScores(Guid userId){
-            var likedByUser = await _db.Swipes
-                .Where(s =>
-                    s.UserId == userId &&
-                    s.Direction == SwipeDirection.Right)
-                .Select(s => s.Movie.TmdbId)
-                .ToListAsync();
-
-            if (!likedByUser.Any())
-                return [];
-
-
-            var similarUsers = await _db.Swipes
-                .Where(s =>
-                    likedByUser.Contains(s.Movie.TmdbId) &&
-                    s.UserId != userId &&
-                    s.Direction == SwipeDirection.Right)
-                .GroupBy(s => s.UserId)
-                .Select(g => new
-                {
-                    UserId = g.Key,
-                    Similarity = g.Count()
-                })
-                .OrderByDescending(x => x.Similarity)
-                .Take(50)
-                .ToListAsync();
-
-            var ids = similarUsers
-                .Select(x => x.UserId)
-                .ToList();
-
-
-            var recommendations = await _db.Swipes
-                .Include(s => s.Movie)
-                .Where(s =>
-                    ids.Contains(s.UserId) &&
-                    s.Direction == SwipeDirection.Right)
-                .ToListAsync();
-
-            return recommendations
-                .GroupBy(x => x.Movie!.TmdbId)
-                .ToDictionary(
-                    g => g.Key,
-                    g => Math.Min(g.Count() / 10f, 1f));
         }
 
         // ─── Helpers ──────────────────────────────────────────────────

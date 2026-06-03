@@ -250,24 +250,11 @@
       "DocumentGroups": [
         {
           "DockedWidth": 200,
-          "SelectedChildIndex": 4,
+          "SelectedChildIndex": 3,
           "Children": [
             {
               "$type": "Bookmark",
               "Name": "ST:0:0:{1c4feeaa-4718-4aa9-859d-94ce25d182ba}"
-            },
-            {
-              "$type": "Document",
-              "DocumentIndex": 5,
-              "Title": "UserProfileConfiguration.cs",
-              "DocumentMoniker": "C:\\Users\\jephtance\\Desktop\\swipefilm\\swipefilm\\swipefilm\\Data\\Configurations\\UserProfileConfiguration.cs",
-              "RelativeDocumentMoniker": "swipefilm\\Data\\Configurations\\UserProfileConfiguration.cs",
-              "ToolTip": "C:\\Users\\jephtance\\Desktop\\swipefilm\\swipefilm\\swipefilm\\Data\\Configurations\\UserProfileConfiguration.cs",
-              "RelativeToolTip": "swipefilm\\Data\\Configurations\\UserProfileConfiguration.cs",
-              "ViewState": "AgIAAAMAAAAAAAAAAAAAABYAAAAyAAAAAAAAAA==",
-              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
-              "WhenOpened": "2026-05-31T01:10:31.006Z",
-              "EditorCaption": ""
             },
             {
               "$type": "Document",
@@ -301,11 +288,24 @@
               "Title": "RecommendationEngine.cs",
               "DocumentMoniker": "C:\\Users\\jephtance\\Desktop\\swipefilm\\swipefilm\\swipefilm\\Auth\\RecommendationEngine.cs",
               "RelativeDocumentMoniker": "swipefilm\\Auth\\RecommendationEngine.cs",
-              "ToolTip": "C:\\Users\\jephtance\\Desktop\\swipefilm\\swipefilm\\swipefilm\\Auth\\RecommendationEngine.cs*",
-              "RelativeToolTip": "swipefilm\\Auth\\RecommendationEngine.cs*",
-              "ViewState": "AgIAAHIBAAAAAAAAAAAIwJYBAAB0AAAAAAAAAA==",
+              "ToolTip": "C:\\Users\\jephtance\\Desktop\\swipefilm\\swipefilm\\swipefilm\\Auth\\RecommendationEngine.cs",
+              "RelativeToolTip": "swipefilm\\Auth\\RecommendationEngine.cs",
+              "ViewState": "AgIAAAUBAAAAAAAAAAAIwL8BAAANAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
               "WhenOpened": "2026-05-31T05:50:33.783Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 5,
+              "Title": "UserProfileConfiguration.cs",
+              "DocumentMoniker": "C:\\Users\\jephtance\\Desktop\\swipefilm\\swipefilm\\swipefilm\\Data\\Configurations\\UserProfileConfiguration.cs",
+              "RelativeDocumentMoniker": "swipefilm\\Data\\Configurations\\UserProfileConfiguration.cs",
+              "ToolTip": "C:\\Users\\jephtance\\Desktop\\swipefilm\\swipefilm\\swipefilm\\Data\\Configurations\\UserProfileConfiguration.cs",
+              "RelativeToolTip": "swipefilm\\Data\\Configurations\\UserProfileConfiguration.cs",
+              "ViewState": "AgIAAAMAAAAAAAAAAAAAABYAAAAyAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2026-05-31T01:10:31.006Z",
               "EditorCaption": ""
             },
             {
