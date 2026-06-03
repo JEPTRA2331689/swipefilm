@@ -11,7 +11,7 @@
         public Dictionary<string, float> ActorWeights { get; set; } = [];
         public Dictionary<string, float> KeywordWeights { get; set; } = [];
 
-        public float PreferredMinYear { get; set; } = 1970;
+        public float PreferredMinYear { get; set; } = DateTime.Now.Year - 5;
         public float PreferredRuntimeMax { get; set; } = 180;
         public float IndieVsBlockbuster { get; set; } = 0.5f; // 0=indie, 1=blockbuster
         public int TotalSignals { get; set; } = 0;
