@@ -17,7 +17,7 @@ namespace swipefilm.Auth
 
         public async Task<(List<ScoredMovie> movies, HashSet<int> available)>
             GetRecommendationsAsync(
-                    Guid userId,
+            Guid userId,
             Guid serverId,
             RecommendationContext context,
             int count = 20)
@@ -26,7 +26,19 @@ namespace swipefilm.Auth
             var excluded = await GetExcludedMoviesAsync(userId, context);
             var available = await GetAvailableMoviesAsync(serverId);
             Console.WriteLine($"Available count = {available.Count}");
-            var weights = ComputeDynamicWeights(profile);
+            var weights = ComputeDynamicWeights(profile, context);
+
+            if (context == RecommendationContext.Discovery)
+            {
+                var watchedTmdbIds = await _db.WatchHistory
+                    .Include(w => w.Movie)
+                    .Where(w => w.UserId == userId && w.Movie != null)
+                    .Select(w => w.Movie!.TmdbId)
+                    .ToListAsync();
+
+                excluded = excluded.Concat(watchedTmdbIds).ToHashSet();
+            }
+
 
             var candidates = await _db.Movies
                 .Where(m => !excluded.Contains(m.TmdbId)
@@ -43,9 +55,15 @@ namespace swipefilm.Auth
 
         // ─── Pondérations dynamiques ──────────────────────────────────
 
-        private AlgoWeights ComputeDynamicWeights(UserProfile profile)
+        private AlgoWeights ComputeDynamicWeights(UserProfile profile,
+            RecommendationContext context = RecommendationContext.Solo)
+            
         {
             var maturity = Math.Min(profile.TotalSignals / 50f, 1f);
+
+            float availableWeight = context == RecommendationContext.Discovery
+                ? 0.01f  // ← quasi nul → films non dispo remontent
+                : 0.05f + (0.05f * maturity);
 
             return new AlgoWeights
             {
@@ -53,7 +71,7 @@ namespace swipefilm.Auth
                 ContentBased = 0.30f - (0.05f * maturity),
                 Collaborative = 0.20f,
                 Popularity = 0.30f - (0.20f * maturity),
-                Available = 0.05f + (0.05f * maturity)
+                Available = availableWeight
             };
         }
 
@@ -160,7 +178,7 @@ namespace swipefilm.Auth
             var sorted = scored.OrderByDescending(s => s.Score).ToList();
 
             float discoveryRatio = context == RecommendationContext.Discovery
-                ? 0.40f : 0.15f;
+                ? 0.50f : 0.15f;
 
             int topCount = (int)(count * (1f - discoveryRatio));
             int randomCount = count - topCount;
