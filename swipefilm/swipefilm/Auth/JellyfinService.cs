@@ -5,11 +5,11 @@ namespace swipefilm.Auth
 {
     public class JellyfinService : IMediaServerService
     {
-        private readonly IUserServerService _serverService;
+        private readonly IServerConfigService _serverService;
         private readonly HttpClient _http;
 
         public JellyfinService(
-            IUserServerService serverService,
+            IServerConfigService serverService,
             IHttpClientFactory httpClientFactory)
         {
             _serverService = serverService;
@@ -18,12 +18,16 @@ namespace swipefilm.Auth
 
         // ─── Bibliothèque ─────────────────────────────────────────────
 
-        public async Task<List<MediaItem>> GetLibraryAsync(Guid serverId)
+        public async Task<List<MediaItem>> GetLibraryAsync(string? userId)
         {
-            var (url, token) = await _serverService
-                .GetDecryptedCredentialsAsync(serverId);
+            var (url, token) = await _serverService.GetDecryptedCredentialsAsync();
 
-            var userId = await GetJellyfinUserIdAsync(url, token);
+            // ✅ Si userId null → endpoint admin (pas besoin d'un user spécifique)
+            // GET /Items retourne tous les films de la bibliothèque
+            var baseEndpoint = !string.IsNullOrEmpty(userId)
+                ? $"{url}/Users/{userId}/Items"
+                : $"{url}/Items";
+
             var items = new List<MediaItem>();
             int startIndex = 0;
             const int pageSize = 100;
@@ -32,13 +36,15 @@ namespace swipefilm.Auth
             do
             {
                 var response = await _http.GetAsync(
-                    $"{url}/Users/{userId}/Items" +
+                    $"{baseEndpoint}" +
                     $"?IncludeItemTypes=Movie,Series" +
                     $"&Recursive=true" +
                     $"&Fields=ProviderIds,RunTimeTicks,OfficialRating" +
                     $"&StartIndex={startIndex}" +
                     $"&Limit={pageSize}" +
                     $"&api_key={token}");
+
+                Console.WriteLine($"[Jellyfin] Library GET {response.StatusCode} — {baseEndpoint}");
 
                 response.EnsureSuccessStatusCode();
                 var json = await response.Content.ReadFromJsonAsync<JsonElement>();
@@ -54,19 +60,50 @@ namespace swipefilm.Auth
             return items;
         }
 
+        // Dans Auth/JellyfinService.cs — nouvelle méthode publique
+        public async Task<(string locale, string region)> GetServerLocaleAsync()
+        {
+            var (url, token) = await _serverService.GetDecryptedCredentialsAsync();
+
+            try
+            {
+                var response = await _http.GetAsync(
+                    $"{url}/System/Configuration?api_key={token}");
+
+                if (!response.IsSuccessStatusCode) return ("en", "US");
+
+                var json = await response.Content.ReadFromJsonAsync<JsonElement>();
+
+                var uiCulture = json.TryGetProperty("UICulture", out var ui)
+                    ? ui.GetString() ?? "en-US" : "en-US";
+
+                var region = json.TryGetProperty("MetadataCountryCode", out var rc)
+                    ? rc.GetString() ?? "US" : "US";
+
+                var locale = uiCulture.Contains('-')
+                    ? uiCulture.Split('-')[0].ToLower()
+                    : uiCulture.ToLower();
+
+                return (locale, region.ToUpper());
+            }
+            catch
+            {
+                return ("en", "US");
+            }
+        }
+
         // ─── Bibliothèque incrémentale ────────────────────────────────
 
         public async Task<List<MediaItem>> GetLibraryIncrementalAsync(
-            Guid serverId, DateTime? since)
+            DateTime? since, string? userId)
         {
             // Si pas de date → sync complète
             if (since is null)
-                return await GetLibraryAsync(serverId);
+                return await GetLibraryAsync(userId);
 
             var (url, token) = await _serverService
-                .GetDecryptedCredentialsAsync(serverId);
+                .GetDecryptedCredentialsAsync();
 
-            var userId = await GetJellyfinUserIdAsync(url, token);
             var items = new List<MediaItem>();
             int startIndex = 0;
             const int pageSize = 100;
@@ -76,10 +113,15 @@ namespace swipefilm.Auth
             var sinceStr = since.Value.ToUniversalTime()
                 .ToString("yyyy-MM-ddTHH:mm:ssZ");
 
+            // ✅ Si userId null → endpoint admin (même pattern que GetLibraryAsync)
+            var baseEndpoint = !string.IsNullOrEmpty(userId)
+                ? $"{url}/Users/{userId}/Items"
+                : $"{url}/Items";
+
             do
             {
                 var response = await _http.GetAsync(
-                    $"{url}/Users/{userId}/Items" +
+                    $"{baseEndpoint}" +
                     $"?IncludeItemTypes=Movie,Series" +
                     $"&Recursive=true" +
                     $"&Fields=ProviderIds,RunTimeTicks,OfficialRating" +
@@ -131,16 +173,26 @@ namespace swipefilm.Auth
 
         // ─── Historique optimisé ──────────────────────────────────────
 
-        public async Task<List<WatchHistoryItem>> GetWatchHistoryAsync(Guid serverId)
-            => await GetWatchHistoryIncrementalAsync(serverId, null);
+        public async Task<List<WatchHistoryItem>> GetWatchHistoryAsync(string? userId)
+            => await GetWatchHistoryIncrementalAsync(null, userId);
 
         public async Task<List<WatchHistoryItem>> GetWatchHistoryIncrementalAsync(
-            Guid serverId, DateTime? since)
+            DateTime? since, string? userId)
         {
-            var (url, token) = await _serverService
-                .GetDecryptedCredentialsAsync(serverId);
+            // ✅ Sans userId, l'historique n'a pas de sens (Played/PlayCount/
+            // PlaybackPositionTicks sont par-utilisateur) — et Jellyfin renvoie
+            // une 500 si on lui demande SortBy=DatePlayed sans contexte user.
+            // Pas la peine de retenter, il n'y a rien à récupérer.
+            if (string.IsNullOrEmpty(userId))
+            {
+                Console.WriteLine(
+                    "[Jellyfin] Historique ignoré — aucun JellyfinUserId associé à cet utilisateur");
+                return new List<WatchHistoryItem>();
+            }
 
-            var userId = await GetJellyfinUserIdAsync(url, token);
+            var (url, token) = await _serverService
+                .GetDecryptedCredentialsAsync();
+
 
             // ✅ UserData inclus directement dans la liste — plus d'appel séparé
             var items = new List<WatchHistoryItem>();
@@ -157,11 +209,15 @@ namespace swipefilm.Auth
 
             do
             {
+                var baseEndpoint = !string.IsNullOrEmpty(userId)
+                    ? $"{url}/Users/{userId}/Items"
+                    : $"{url}/Items";
+
                 var response = await _http.GetAsync(
-                    $"{url}/Users/{userId}/Items" +
+                    $"{baseEndpoint}" +
                     $"?IncludeItemTypes=Movie,Series" +
                     $"&Recursive=true" +
-                    $"&Fields=ProviderIds,UserData,RunTimeTicks" + // ← UserData inclus
+                    $"&Fields=ProviderIds,UserData,RunTimeTicks" +
                     $"&SortBy=DatePlayed" +
                     $"&SortOrder=Descending" +
                     dateFilter +
@@ -302,27 +358,82 @@ namespace swipefilm.Auth
             );
         }
 
+        // ─── Saisons ──────────────────────────────────────────────────
+
+        public async Task<List<SeasonItem>> GetSeasonsAsync(
+            string seriesServerId, string? userId)
+        {
+            var (url, token) = await _serverService.GetDecryptedCredentialsAsync();
+
+            var endpoint = !string.IsNullOrEmpty(userId)
+                ? $"{url}/Shows/{seriesServerId}/Seasons?userId={userId}"
+                : $"{url}/Shows/{seriesServerId}/Seasons";
+
+            var response = await _http.GetAsync(
+                $"{endpoint}&Fields=ItemCounts,ChildCount&api_key={token}");
+
+            if (!response.IsSuccessStatusCode) return [];
+
+            var json = await response.Content.ReadFromJsonAsync<JsonElement>();
+            var seasons = new List<SeasonItem>();
+
+            foreach (var season in json.GetProperty("Items").EnumerateArray())
+            {
+                var seasonNumber = season.TryGetProperty("IndexNumber", out var idx)
+                    ? idx.GetInt32() : 0;
+
+                var episodeCount = season.TryGetProperty("ChildCount", out var cc)
+                    ? cc.GetInt32() : 0;
+
+                var userData = season.TryGetProperty("UserData", out var ud) ? ud : default;
+
+                var unplayed = userData.ValueKind != JsonValueKind.Undefined
+                    && userData.TryGetProperty("UnplayedItemCount", out var up)
+                    ? up.GetInt32() : episodeCount;
+
+                var watchedCount = Math.Max(0, episodeCount - unplayed);
+
+                var isFavorite = userData.ValueKind != JsonValueKind.Undefined
+                    && userData.TryGetProperty("IsFavorite", out var fav)
+                    && fav.GetBoolean();
+
+                DateTime lastPlayed = DateTime.UtcNow;
+                if (userData.ValueKind != JsonValueKind.Undefined
+                    && userData.TryGetProperty("LastPlayedDate", out var lpDate)
+                    && lpDate.ValueKind != JsonValueKind.Null)
+                    lastPlayed = lpDate.GetDateTime();
+
+                var hash = ComputeHash(watchedCount, episodeCount, isFavorite, null);
+
+                seasons.Add(new SeasonItem(
+                    ServerId: season.GetProperty("Id").GetString()!,
+                    SeasonNumber: seasonNumber,
+                    EpisodeCount: episodeCount,
+                    WatchedEpisodeCount: watchedCount,
+                    IsFavorite: isFavorite,
+                    UserRating: null,
+                    LastWatchedAt: lastPlayed,
+                    FirstWatchedAt: lastPlayed,
+                    ContentHash: hash
+                ));
+            }
+
+            return seasons;
+        }
+
         // ─── Stream URL ───────────────────────────────────────────────
 
-        public async Task<string> GetStreamUrlAsync(Guid serverId, string itemId)
+        public async Task<string> GetStreamUrlAsync(string itemId)
         {
             var (url, token) = await _serverService
-                .GetDecryptedCredentialsAsync(serverId);
+                .GetDecryptedCredentialsAsync();
 
             return $"{url}/Videos/{itemId}/stream?api_key={token}&static=true";
         }
 
         // ─── Helpers ──────────────────────────────────────────────────
 
-        private async Task<string> GetJellyfinUserIdAsync(string url, string token)
-        {
-            var response = await _http.GetAsync($"{url}/Users/Me?api_key={token}");
-            response.EnsureSuccessStatusCode();
 
-            var json = await response.Content.ReadFromJsonAsync<JsonElement>();
-            return json.GetProperty("Id").GetString()
-                ?? throw new InvalidOperationException("UserId Jellyfin introuvable");
-        }
 
         private static string ComputeHash(
             int watchDuration, int playCount, bool isFavorite, int? rating)

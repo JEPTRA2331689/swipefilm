@@ -10,6 +10,18 @@
         public Dictionary<string, float> DirectorWeights { get; set; } = [];
         public Dictionary<string, float> ActorWeights { get; set; } = [];
         public Dictionary<string, float> KeywordWeights { get; set; } = [];
+        public Dictionary<string, float> OriginalLanguageWeights { get; set; } = [];
+        public Dictionary<string, float> PreferredDecadeWeights { get; set; } = [];
+        public Dictionary<string, int> GenreCounts { get; set; } = [];
+        public Dictionary<string, int> DirectorCounts { get; set; } = [];
+        public Dictionary<string, int> ActorCounts { get; set; } = [];
+        public Dictionary<string, int> KeywordCounts { get; set; } = [];
+        public Dictionary<string, int> LanguageCounts { get; set; } = [];
+        public float AvgCompletionRate { get; set; } = 0f;
+        public float AvgUserRating { get; set; } = 0f;
+        public int FavoriteCount { get; set; } = 0;
+        public float RepeatViewRate { get; set; } = 0f;
+
 
         public float PreferredMinYear { get; set; } = DateTime.Now.Year - 5;
         public float PreferredRuntimeMax { get; set; } = 180;

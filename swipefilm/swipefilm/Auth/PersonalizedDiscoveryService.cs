@@ -1,4 +1,4 @@
-﻿// swipefilm/Services/PersonalizedDiscoveryService.cs
+﻿// swipefilm/Auth/PersonalizedDiscoveryService.cs
 using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using swipefilm.Auth.swipefilm.Services;
@@ -9,460 +9,835 @@ namespace swipefilm.Auth
 {
     public class PersonalizedDiscoveryService
     {
-        private readonly HttpClient _http;
         private readonly AppDbContext _db;
-        private readonly TmdbService _tmdb;
+        private readonly HttpClient _tmdb;
         private readonly string _apiKey;
-        private readonly IServiceProvider _serviceProvider; // ← ajouter
+        private readonly TmdbService _enrichment;
+
+
+        // Mapping genres texte → ID TMDB
+        private static readonly Dictionary<string, int> GenreIdMap = new()
+        {
+            ["Action"] = 28,
+            ["Adventure"] = 12,
+            ["Animation"] = 16,
+            ["Comedy"] = 35,
+            ["Crime"] = 80,
+            ["Documentary"] = 99,
+            ["Drama"] = 18,
+            ["Family"] = 10751,
+            ["Fantasy"] = 14,
+            ["History"] = 36,
+            ["Horror"] = 27,
+            ["Music"] = 10402,
+            ["Mystery"] = 9648,
+            ["Romance"] = 10749,
+            ["Science Fiction"] = 878,
+            ["Thriller"] = 53,
+            ["War"] = 10752,
+            ["Western"] = 37,
+            // Français
+            ["Aventure"] = 12,
+            ["Animation"] = 16,
+            ["Comédie"] = 35,
+            ["Documentaire"] = 99,
+            ["Drame"] = 18,
+            ["Famille"] = 10751,
+            ["Fantastique"] = 14,
+            ["Histoire"] = 36,
+            ["Horreur"] = 27,
+            ["Musique"] = 10402,
+            ["Mystère"] = 9648,
+            ["Romance"] = 10749,
+            ["Science-fiction"] = 878,
+        };
+
+        // Mapping genres texte → ID TMDB — liste TV, différente de la liste films
+        // (ex: pas de "Action"/"Adventure" séparés, "Action & Adventure" combiné)
+        private static readonly Dictionary<string, int> TvGenreIdMap = new()
+        {
+            ["Action & Aventure"] = 10759,
+            ["Animation"] = 16,
+            ["Comédie"] = 35,
+            ["Crime"] = 80,
+            ["Documentaire"] = 99,
+            ["Drame"] = 18,
+            ["Familiale"] = 10751,
+            ["Enfants"] = 10762,
+            ["Mystère"] = 9648,
+            ["Actualités"] = 10763,
+            ["Réalité"] = 10764,
+            ["Science-Fiction & Fantastique"] = 10765,
+            ["Feuilleton"] = 10766,
+            ["Talk-show"] = 10767,
+            ["Guerre & Politique"] = 10768,
+            ["Western"] = 37,
+        };
 
         public PersonalizedDiscoveryService(
-            IHttpClientFactory factory,
             AppDbContext db,
-            TmdbService tmdb,
+            IHttpClientFactory httpFactory,
             IConfiguration config,
-            IServiceProvider serviceProvider)
+            TmdbService enrichment)
         {
-            _http = factory.CreateClient("Tmdb");
             _db = db;
-            _tmdb = tmdb;
+            _tmdb = httpFactory.CreateClient("Tmdb");
             _apiKey = config["Tmdb:ApiKey"]!;
-            _serviceProvider = serviceProvider;
+            _enrichment = enrichment;
         }
+
+        // ─── Point d'entrée principal ─────────────────────────────
 
         public async Task DiscoverForUserAsync(Guid userId)
         {
+            var section = SectionProfile.RecentReleases; // section ciblée pour les sorties récentes
+            Console.WriteLine($"[Discovery] Début pour userId={userId}");
+
             var profile = await _db.UserProfiles
                 .FirstOrDefaultAsync(p => p.UserId == userId);
 
-            // Films que l'user a vraiment aimés (signal fort)
-            var lovedMovies = await GetLovedMoviesAsync(userId);
-            Console.WriteLine($"[Discovery] {lovedMovies.Count} films aimés trouvés");
-
-            if (!lovedMovies.Any() && profile is null)
+            if (profile is null)
             {
-                // Cold start → on ne fait rien encore
-                // L'algo de reco gère ça avec la popularité
+                Console.WriteLine("[Discovery] Profil introuvable — abandon");
                 return;
             }
 
-            var discoveredIds = new HashSet<int>();
-
-            // ── Stratégie 1 : Recommandations TMDB basées sur films aimés
-            foreach (var movie in lovedMovies.Take(10))
-            {
-                var similar = await FetchSimilarAsync(movie.TmdbId, movie.ContentType);
-                foreach (var id in similar) discoveredIds.Add(id);
-
-                var recs = await FetchTmdbRecommendationsAsync(movie.TmdbId, movie.ContentType);
-                foreach (var id in recs) discoveredIds.Add(id);
-            }
-
-            // ── Stratégie 2 : Discover par réalisateurs favoris
-            if (profile?.DirectorWeights.Any() == true)
-            {
-                var topDirectors = profile.DirectorWeights
-                    .Where(d => d.Value > 0.5f)
-                    .OrderByDescending(d => d.Value)
-                    .Take(5)
-                    .Select(d => d.Key)
-                    .ToList();
-
-                foreach (var director in topDirectors)
-                {
-                    var films = await FetchByPersonAsync(director);
-                    foreach (var id in films) discoveredIds.Add(id);
-                }
-            }
-
-            // ── Stratégie 3 : Discover par acteurs favoris
-            if (profile?.ActorWeights.Any() == true)
-            {
-                var topActors = profile.ActorWeights
-                    .Where(a => a.Value > 0.6f)
-                    .OrderByDescending(a => a.Value)
-                    .Take(5)
-                    .Select(a => a.Key)
-                    .ToList();
-
-                foreach (var actor in topActors)
-                {
-                    var films = await FetchByPersonAsync(actor);
-                    foreach (var id in films) discoveredIds.Add(id);
-                }
-
-            }
-
-            // ── Stratégie 4 : Discover par combinaison de genres
-            // Pas juste un genre, mais la combinaison précise
-            if (profile?.GenreWeights.Any() == true)
-            {
-                var topGenres = profile.GenreWeights
-                    .Where(g => g.Value > 0.5f)
-                    .OrderByDescending(g => g.Value)
-                    .Take(4)
-                    .Select(g => g.Key)
-                    .ToList();
-
-                // Combinaisons de 2 genres (plus précis qu'un seul)
-                for (int i = 0; i < topGenres.Count - 1; i++)
-                {
-                    var combo = new[] { topGenres[i], topGenres[i + 1] };
-                    var films = await FetchByGenreComboAsync(
-                        combo, profile.PreferredRuntimeMax);
-                    foreach (var id in films) discoveredIds.Add(id);
-                }
-            }
-
-            // ── Stratégie 5 : Keywords profonds
-            // Si tu aimes "psychological thriller" + "unreliable narrator"
-            // → trouve des films avec ces deux keywords précis
-            if (profile?.KeywordWeights.Any() == true)
-            {
-                var topKeywords = profile.KeywordWeights
-                    .Where(k => k.Value > 0.6f)
-                    .OrderByDescending(k => k.Value)
-                    .Take(3)
-                    .Select(k => k.Key)
-                    .ToList();
-
-                var films = await FetchByKeywordsAsync(topKeywords);
-                foreach (var id in films) discoveredIds.Add(id);
-            }
-
-            // ── Stratégie 6 : Époque préférée
-            // Si tu regardes surtout des films des années 90-2000
-            // → creuse dans cette époque
-            if (lovedMovies.Any())
-            {
-                var avgYear = lovedMovies
-                    .Where(m => m.ReleaseDate.HasValue)
-                    .Average(m => (double)m.ReleaseDate!.Value.Year);
-
-                if (avgYear > 0)
-                {
-                    var films = await FetchByEraAsync(
-                        (int)(avgYear - 10),
-                        (int)(avgYear + 5),
-                        profile?.GenreWeights
-                            .OrderByDescending(g => g.Value)
-                            .FirstOrDefault().Key);
-                    foreach (var id in films) discoveredIds.Add(id);
-                }
-            }
-
-            // Filtrer films déjà en BD
-            var existingIds = await _db.Movies
+            // Charge les TmdbIds déjà en BD pour déduplication
+            var existingTmdbIds = (await _db.Movies
                 .Select(m => m.TmdbId)
-                .ToListAsync();
+                .ToListAsync())
+                .ToHashSet();
 
-            var newIds = discoveredIds
-                .Where(id => !existingIds.Contains(id))
+            var discovered = new List<int>(); // TmdbIds à ajouter
+
+            // ── Source 1 — Films similaires aux swipes droits ─────
+            discovered.AddRange(
+                await DiscoverFromLikedMoviesAsync(userId, existingTmdbIds));
+
+            // ── Source 2 — Discover par genres préférés ───────────
+            discovered.AddRange(
+                await DiscoverByGenresAsync(profile, existingTmdbIds));
+
+            // ── Source 3 — Discover par langue préférée ───────────
+            discovered.AddRange(
+                await DiscoverByLanguageAsync(profile, existingTmdbIds));
+
+            // ── Source 4 — Discover par décennie préférée ─────────
+            discovered.AddRange(
+                await DiscoverByDecadeAsync(profile, existingTmdbIds));
+            discovered.AddRange(
+                await DiscoverRecentReleasesAsync(userId, existingTmdbIds, profile, section));
+
+            await DiscoverSeriesForUserAsync(userId);
+            // Déduplique et exclut ce qui est déjà en BD
+            var toAdd = discovered
+                .Distinct()
+                .Where(id => !existingTmdbIds.Contains(id))
                 .ToList();
 
-            // Ajouter en BD
-            foreach (var id in newIds)
+            Console.WriteLine($"[Discovery] {toAdd.Count} nouveaux films à ajouter");
+
+            if (!toAdd.Any()) return;
+
+            // ── Ajoute en BD avec CachedAt = MinValue ─────────────
+            // (seront enrichis par TmdbEnrichmentService)
+            var newMovies = toAdd.Select(tmdbId => new Movie
             {
-                _db.Movies.Add(new Movie
-                {
-                    Id = Guid.NewGuid(),
-                    TmdbId = id,
-                    Title = "",
-                    ContentType = "movie",
-                    CachedAt = DateTime.MinValue
-                });
-            }
+                Id = Guid.NewGuid(),
+                TmdbId = tmdbId,
+                Title = $"Film #{tmdbId}", // titre temporaire
+                CachedAt = DateTime.MinValue,  // ← sera enrichi
+                ContentType = "movie",
+            }).ToList();
 
-            if (newIds.Any())
-                await _db.SaveChangesAsync();
+            _db.Movies.AddRange(newMovies);
+            await _db.SaveChangesAsync();
 
-            // Enrichir immédiatement les nouveaux films
-            var newMovies = await _db.Movies
-                .Where(m => newIds.Contains(m.TmdbId))
-                .ToListAsync();
+            Console.WriteLine($"[Discovery] {newMovies.Count} films ajoutés en BD");
 
-            foreach (var movie in newMovies)
-            {
-                await _tmdb.EnrichMovieAsync(movie);
-                await Task.Delay(25); // Rate limit TMDB
-            }
+            // ── Enrichit immédiatement via TMDB ───────────────────
+            await _enrichment.EnrichAllMoviesAsync();
+
+            Console.WriteLine("[Discovery] Enrichissement terminé ✅");
+
+            // ── Même principe pour les séries ─────────────────────
+            await DiscoverSeriesForUserAsync(userId);
         }
 
-        // ─── Films vraiment aimés ─────────────────────────────────────
+        // ─── Point d'entrée séries — même principe, table Series ──────
 
-        private async Task<List<Movie>> GetLovedMoviesAsync(Guid userId)
+        public async Task DiscoverSeriesForUserAsync(Guid userId)
         {
-            var history = await _db.WatchHistory
-                .Include(w => w.Movie)
-                .Where(w => w.UserId == userId && w.Movie != null)
-                .ToListAsync();
+            Console.WriteLine($"[Discovery] Séries — début pour userId={userId}");
 
-            var scored = history
-                .Select(w =>
-                {
-                    var completion = w.Movie!.RuntimeMinutes > 0
-                        ? (float)w.WatchDurationSec
-                            / (w.Movie.RuntimeMinutes!.Value * 60) * 100f
-                        : 0f;
+            var profile = await _db.UserSeriesProfiles
+                .FirstOrDefaultAsync(p => p.UserId == userId);
 
-                    float score = completion / 100f;
-                    if (w.UserRating.HasValue) score += w.UserRating.Value / 10f;
-                    if (w.IsFavorite) score += 0.5f;
-                    if (w.ViewCount > 1) score += 0.3f * (w.ViewCount - 1);
+            if (profile is null)
+            {
+                Console.WriteLine("[Discovery] Séries — profil introuvable, abandon");
+                return;
+            }
 
-                    return (Movie: w.Movie!, Score: score);
-                })
-                .OrderByDescending(x => x.Score)
+            var existingTmdbIds = (await _db.Series
+                .Select(s => s.TmdbId)
+                .ToListAsync())
+                .ToHashSet();
+
+            var discovered = new List<int>();
+
+            discovered.AddRange(
+                await DiscoverFromLikedSeriesAsync(userId, existingTmdbIds));
+
+            discovered.AddRange(
+                await DiscoverSeriesByGenresAsync(profile, existingTmdbIds));
+
+            discovered.AddRange(
+                await DiscoverSeriesByLanguageAsync(profile, existingTmdbIds));
+
+            discovered.AddRange(
+                await DiscoverSeriesByDecadeAsync(profile, existingTmdbIds));
+
+            discovered.AddRange(
+                await DiscoverRecentSeriesAsync(profile, existingTmdbIds));
+
+            var toAdd = discovered
+                .Distinct()
+                .Where(id => !existingTmdbIds.Contains(id))
                 .ToList();
 
-            // ✅ Seuil progressif — prend les meilleurs même si score bas
-            var loved = scored
-                .Where(x => x.Score > 0.8f)
-                .Select(x => x.Movie)
-                .Take(20)
-                .ToList();
+            Console.WriteLine($"[Discovery] Séries — {toAdd.Count} nouvelles à ajouter");
 
-            // Fallback 1 : si moins de 3 films aimés → prend top 10 peu importe le score
-            if (loved.Count < 3)
+            if (!toAdd.Any()) return;
+
+            var newSeries = toAdd.Select(tmdbId => new Series
             {
-                loved = scored
-                    .Select(x => x.Movie)
-                    .Take(10)
-                    .ToList();
-            }
+                Id = Guid.NewGuid(),
+                TmdbId = tmdbId,
+                Title = $"Série #{tmdbId}",
+                CachedAt = DateTime.MinValue,
+            }).ToList();
 
-            // Fallback 2 : pas d'historique du tout → prend films au hasard en BD
-            if (!loved.Any())
-            {
-                loved = await _db.Movies
-                    .Where(m => m.CachedAt != DateTime.MinValue
-                             && m.TmdbRating > 6.0f)
-                    .OrderByDescending(m => m.TmdbRating)
-                    .Take(10)
-                    .ToListAsync();
-            }
+            _db.Series.AddRange(newSeries);
+            await _db.SaveChangesAsync();
 
-            return loved;
+            Console.WriteLine($"[Discovery] Séries — {newSeries.Count} ajoutées en BD");
+
+            await _enrichment.EnrichAllSeriesAsync();
+
+            Console.WriteLine("[Discovery] Séries — enrichissement terminé ✅");
         }
 
-        // ─── TMDB Similar ─────────────────────────────────────────────
-
-        private async Task<List<int>> FetchSimilarAsync(
-            int tmdbId, string type)
+        private async Task<List<int>> FetchTmdbSeriesIdsAsync(
+            string endpoint, HashSet<int> existing, int maxPages = 10)
         {
-            var endpoint = type == "movie"
-                ? $"movie/{tmdbId}/similar"
-                : $"tv/{tmdbId}/similar";
-
-            return await FetchIdsFromEndpointAsync(endpoint);
-        }
-
-        // ─── TMDB Recommendations ─────────────────────────────────────
-
-        private async Task<List<int>> FetchTmdbRecommendationsAsync(
-            int tmdbId, string type)
-        {
-            var endpoint = type == "movie"
-                ? $"movie/{tmdbId}/recommendations"
-                : $"tv/{tmdbId}/recommendations";
-
-            return await FetchIdsFromEndpointAsync(endpoint);
-        }
-
-        // ─── Par personne (réalisateur ou acteur) ─────────────────────
-
-        private async Task<List<int>> FetchByPersonAsync(string name)
-        {
-            // Cherche l'ID de la personne
-            var searchResp = await _http.GetAsync(
-                $"https://api.themoviedb.org/3/search/person" +
-                $"?api_key={_apiKey}&query={Uri.EscapeDataString(name)}");
-
-            if (!searchResp.IsSuccessStatusCode) return [];
-
-            var searchJson = await searchResp.Content
-                .ReadFromJsonAsync<JsonElement>();
-
-            var results = searchJson.GetProperty("results");
-            if (!results.EnumerateArray().Any()) return [];
-
-            var personId = results.EnumerateArray()
-                .First()
-                .GetProperty("id")
-                .GetInt32();
-
-            // Récupère sa filmographie
-            var creditsResp = await _http.GetAsync(
-                $"https://api.themoviedb.org/3/person/{personId}/movie_credits" +
-                $"?api_key={_apiKey}");
-
-            if (!creditsResp.IsSuccessStatusCode) return [];
-
-            var creditsJson = await creditsResp.Content
-                .ReadFromJsonAsync<JsonElement>();
-
-            // Prend ses films les mieux notés (pas les plus populaires)
-            return creditsJson.GetProperty("crew")
-                .EnumerateArray()
-                .Where(c => c.GetProperty("job").GetString() == "Director")
-                .Concat(creditsJson.GetProperty("cast").EnumerateArray())
-                .Where(f => f.TryGetProperty("vote_average", out var v)
-                         && v.GetDouble() > 6.5
-                         && f.TryGetProperty("vote_count", out var vc)
-                         && vc.GetInt32() > 100)
-                .OrderByDescending(f =>
-                    f.GetProperty("vote_average").GetDouble())
-                .Take(10)
-                .Select(f => f.GetProperty("id").GetInt32())
-                .ToList();
-        }
-
-        // ─── Par combinaison de genres ────────────────────────────────
-
-        private async Task<List<int>> FetchByGenreComboAsync(
-            string[] genreNames, float preferredRuntime)
-        {
-            var genreMap = await GetGenreMapAsync();
-
-            var genreIds = genreNames
-                .Where(g => genreMap.ContainsKey(g))
-                .Select(g => genreMap[g])
-                .ToList();
-
-            if (!genreIds.Any()) return [];
-
-            var genreParam = string.Join(",", genreIds);
-
-            // Filtre aussi par durée préférée
-            int maxRuntime = (int)Math.Min(preferredRuntime + 30, 240);
-
-            return await FetchIdsFromEndpointAsync(
-                $"discover/movie" +
-                $"?with_genres={genreParam}" +
-                $"&with_runtime.lte={maxRuntime}" +
-                $"&vote_average.gte=6.5" +
-                $"&vote_count.gte=200" +
-                $"&sort_by=vote_average.desc"
-            );
-        }
-
-        // ─── Par keywords ─────────────────────────────────────────────
-
-        private async Task<List<int>> FetchByKeywordsAsync(List<string> keywords)
-        {
-            var keywordIds = new List<int>();
-
-            foreach (var keyword in keywords)
-            {
-                var resp = await _http.GetAsync(
-                    $"https://api.themoviedb.org/3/search/keyword" +
-                    $"?api_key={_apiKey}&query={Uri.EscapeDataString(keyword)}");
-
-                if (!resp.IsSuccessStatusCode) continue;
-
-                var json = await resp.Content.ReadFromJsonAsync<JsonElement>();
-                var first = json.GetProperty("results")
-                    .EnumerateArray()
-                    .FirstOrDefault();
-
-                if (first.ValueKind != JsonValueKind.Undefined)
-                    keywordIds.Add(first.GetProperty("id").GetInt32());
-            }
-
-            if (!keywordIds.Any()) return [];
-
-            var keywordParam = string.Join(",", keywordIds);
-
-            return await FetchIdsFromEndpointAsync(
-                $"discover/movie" +
-                $"?with_keywords={keywordParam}" +
-                $"&vote_average.gte=6.0" +
-                $"&vote_count.gte=100" +
-                $"&sort_by=vote_average.desc"
-            );
-        }
-
-        // ─── Par époque ───────────────────────────────────────────────
-
-        private async Task<List<int>> FetchByEraAsync(
-            int yearFrom, int yearTo, string? topGenre)
-        {
-            var genreParam = "";
-            if (topGenre is not null)
-            {
-                var genreMap = await GetGenreMapAsync();
-                if (genreMap.TryGetValue(topGenre, out var genreId))
-                    genreParam = $"&with_genres={genreId}";
-            }
-
-            return await FetchIdsFromEndpointAsync(
-                $"discover/movie" +
-                $"?primary_release_date.gte={yearFrom}-01-01" +
-                $"&primary_release_date.lte={yearTo}-12-31" +
-                $"&vote_average.gte=7.0" +
-                $"&vote_count.gte=500" +
-                $"&sort_by=vote_average.desc" +
-                genreParam
-            );
-        }
-
-        // ─── Helpers ──────────────────────────────────────────────────
-
-        private async Task<List<int>> FetchIdsFromEndpointAsync(string endpoint)
-        {
+            var result = new List<int>();
             var separator = endpoint.Contains('?') ? "&" : "?";
-            var response = await _http.GetAsync(
-                $"https://api.themoviedb.org/3/{endpoint}" +
-                $"{separator}api_key={_apiKey}&language=fr-FR&page=1");
 
-            if (!response.IsSuccessStatusCode) return [];
-
-            var json = await response.Content.ReadFromJsonAsync<JsonElement>();
-
-            if (!json.TryGetProperty("results", out var results)) return [];
-
-            return results.EnumerateArray()
-                .Select(r => r.GetProperty("id").GetInt32())
-                .ToList();
-        }
-
-        private async Task<Dictionary<string, int>> GetGenreMapAsync()
-        {
-            var response = await _http.GetAsync(
-                $"https://api.themoviedb.org/3/genre/movie/list" +
-                $"?api_key={_apiKey}&language=fr-FR");
-
-            if (!response.IsSuccessStatusCode) return [];
-
-            var json = await response.Content.ReadFromJsonAsync<JsonElement>();
-
-            return json.GetProperty("genres")
-                .EnumerateArray()
-                .ToDictionary(
-                    g => g.GetProperty("name").GetString()!,
-                    g => g.GetProperty("id").GetInt32()
-                );
-        }
-        // Ajoute cette méthode dans PersonalizedDiscoveryService.cs
-        public async Task DiscoverForAllUsersAsync()
-        {
-            using var scope = _serviceProvider.CreateScope();
-            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-
-            var userIds = await db.Users
-                .Select(u => u.Id)
-                .ToListAsync();
-
-            foreach (var userId in userIds)
+            for (int page = 1; page <= maxPages; page++)
             {
                 try
                 {
-                    await DiscoverForUserAsync(userId);
+                    var baseUrl = "https://api.themoviedb.org/3/";
+                    var url = $"{baseUrl}{endpoint}{separator}api_key={_apiKey}&language=fr-FR&page={page}";
+                    var res = await _tmdb.GetAsync(url);
+
+                    if (!res.IsSuccessStatusCode) break;
+
+                    var json = await res.Content.ReadAsStringAsync();
+                    var doc = JsonDocument.Parse(json);
+
+                    if (!doc.RootElement.TryGetProperty("results", out var results)) break;
+
+                    var ids = results.EnumerateArray()
+                        .Where(r => r.TryGetProperty("id", out _))
+                        .Select(r => r.GetProperty("id").GetInt32())
+                        .Where(id => !existing.Contains(id))
+                        .ToList();
+
+                    result.AddRange(ids);
+
+                    if (!doc.RootElement.TryGetProperty("total_pages", out var totalPages)
+                        || page >= totalPages.GetInt32())
+                        break;
+
+                    await Task.Delay(100);
                 }
                 catch (Exception ex)
                 {
-                    Console.WriteLine($"[Discovery] Erreur user {userId}: {ex.Message}");
+                    Console.WriteLine($"[Discovery] Erreur TMDB séries ({endpoint} p{page}): {ex.Message}");
+                    break;
                 }
             }
+
+            return result;
+        }
+
+        // ─── Source 1 — Recommendations + Similar depuis séries aimées ───
+
+        private async Task<List<int>> DiscoverFromLikedSeriesAsync(
+            Guid userId, HashSet<int> existing)
+        {
+            var recentLikes = await _db.Swipes
+                .Include(s => s.Series)
+                .Where(s => s.UserId == userId
+                         && s.Direction == SwipeDirection.Right
+                         && s.Series != null)
+                .OrderByDescending(s => s.CreatedAt)
+                .Take(5)
+                .Select(s => s.Series!.TmdbId)
+                .ToListAsync();
+
+            var topRated = await _db.SeriesWatchHistory
+                .Include(w => w.SeriesSeason).ThenInclude(s => s.Series)
+                .Where(w => w.UserId == userId && w.UserRating.HasValue)
+                .OrderByDescending(w => w.UserRating)
+                .Select(w => w.SeriesSeason.Series.TmdbId)
+                .Distinct()
+                .Take(5)
+                .ToListAsync();
+
+            var favorites = await _db.SeriesWatchHistory
+                .Include(w => w.SeriesSeason).ThenInclude(s => s.Series)
+                .Where(w => w.UserId == userId && w.IsFavorite)
+                .OrderByDescending(w => w.LastWatchedAt)
+                .Select(w => w.SeriesSeason.Series.TmdbId)
+                .Distinct()
+                .Take(5)
+                .ToListAsync();
+
+            var wellWatched = await _db.SeriesWatchHistory
+                .Include(w => w.SeriesSeason).ThenInclude(s => s.Series)
+                .Where(w => w.UserId == userId && w.SeriesSeason.EpisodeCount > 0)
+                .ToListAsync();
+
+            var wellWatchedIds = wellWatched
+                .Where(w => (float)w.WatchedEpisodeCount / w.SeriesSeason.EpisodeCount >= 0.85f)
+                .OrderByDescending(w => w.LastWatchedAt)
+                .Select(w => w.SeriesSeason.Series.TmdbId)
+                .Distinct()
+                .Take(5)
+                .ToList();
+
+            var allReference = recentLikes
+                .Concat(topRated)
+                .Concat(favorites)
+                .Concat(wellWatchedIds)
+                .Distinct()
+                .ToList();
+
+            Console.WriteLine($"[Discovery] Séries de référence : {allReference.Count} uniques");
+
+            var result = new List<int>();
+
+            foreach (var tmdbId in allReference)
+            {
+                result.AddRange(await FetchTmdbSeriesIdsAsync(
+                    $"tv/{tmdbId}/recommendations", existing, maxPages: 2));
+
+                result.AddRange(await FetchTmdbSeriesIdsAsync(
+                    $"tv/{tmdbId}/similar", existing, maxPages: 1));
+
+                await Task.Delay(150);
+            }
+
+            Console.WriteLine($"[Discovery] Séries source 1 : {result.Count}");
+            return result;
+        }
+
+        // ─── Source 2 — Discover séries par genres préférés ───────────────
+
+        private async Task<List<int>> DiscoverSeriesByGenresAsync(
+            UserSeriesProfile profile, HashSet<int> existing)
+        {
+            if (!profile.GenreWeights.Any()) return [];
+
+            var acceptedLangs = profile.OriginalLanguageWeights
+                .Where(l => l.Value > 0.2f)
+                .OrderByDescending(l => l.Value)
+                .Take(3)
+                .Select(l => l.Key)
+                .ToList();
+
+            if (!acceptedLangs.Any())
+                acceptedLangs = ["en", "fr"];
+
+            var langFilter = string.Join("|", acceptedLangs);
+
+            var allGenres = profile.GenreWeights
+                .OrderByDescending(g => g.Value)
+                .Where(g => TvGenreIdMap.ContainsKey(g.Key))
+                .Select(g => TvGenreIdMap[g.Key])
+                .ToList();
+
+            if (!allGenres.Any()) return [];
+
+            var result = new List<int>();
+
+            var topGenres = allGenres.Take(3).ToList();
+            if (topGenres.Any())
+            {
+                result.AddRange(await FetchTmdbSeriesIdsAsync(
+                    $"discover/tv?with_genres={string.Join(",", topGenres)}&with_original_language={langFilter}&sort_by=vote_average.desc&vote_count.gte=100&vote_average.gte=6.5",
+                    existing, maxPages: 5));
+
+                await Task.Delay(150);
+            }
+
+            var extraGenres = allGenres.Skip(3).Take(3).ToList();
+            foreach (var genreId in extraGenres)
+            {
+                result.AddRange(await FetchTmdbSeriesIdsAsync(
+                    $"discover/tv?with_genres={genreId}&with_original_language={langFilter}&sort_by=vote_average.desc&vote_count.gte=100&vote_average.gte=6.5",
+                    existing, maxPages: 10));
+
+                await Task.Delay(150);
+            }
+
+            Console.WriteLine($"[Discovery] Séries source 2 (genres+langues={langFilter}): {result.Count}");
+            return result;
+        }
+
+        // ─── Source 3 — Discover séries par langue préférée ───────────────
+
+        private async Task<List<int>> DiscoverSeriesByLanguageAsync(
+            UserSeriesProfile profile, HashSet<int> existing)
+        {
+            if (!profile.OriginalLanguageWeights.Any()) return [];
+
+            var result = new List<int>();
+
+            var hasNonEnglish = profile.OriginalLanguageWeights.Any(l => l.Key != "en");
+
+            var topLangs = profile.OriginalLanguageWeights
+                .OrderByDescending(l => l.Value)
+                .Where(l => !hasNonEnglish || l.Key != "en")
+                .Take(2)
+                .Select(l => l.Key)
+                .ToList();
+
+            foreach (var lang in topLangs)
+            {
+                result.AddRange(await FetchTmdbSeriesIdsAsync(
+                    $"discover/tv?with_original_language={lang}&sort_by=vote_average.desc&vote_count.gte=50&vote_average.gte=6.0",
+                    existing, maxPages: 20));
+
+                await Task.Delay(150);
+            }
+
+            Console.WriteLine($"[Discovery] Séries source 3 (langues={string.Join(",", topLangs)}): {result.Count}");
+            return result;
+        }
+
+        // ─── Source 4 — Discover séries par décennie préférée ─────────────
+
+        private async Task<List<int>> DiscoverSeriesByDecadeAsync(
+            UserSeriesProfile profile, HashSet<int> existing)
+        {
+            if (!profile.PreferredDecadeWeights.Any()) return [];
+
+            var topDecades = profile.PreferredDecadeWeights
+                .OrderByDescending(d => d.Value)
+                .Take(3)
+                .Select(d => d.Key)
+                .ToList();
+
+            var result = new List<int>();
+
+            foreach (var decade in topDecades)
+            {
+                if (!int.TryParse(decade, out var decadeYear)) continue;
+
+                var yearFrom = decadeYear;
+                var yearTo = decadeYear + 9;
+
+                result.AddRange(await FetchTmdbSeriesIdsAsync(
+                    $"discover/tv?first_air_date.gte={yearFrom}-01-01&first_air_date.lte={yearTo}-12-31&sort_by=vote_average.desc&vote_count.gte=100&vote_average.gte=7.0",
+                    existing, maxPages: 4));
+
+                await Task.Delay(150);
+            }
+
+            Console.WriteLine($"[Discovery] Séries source 4 (décennies): {result.Count}");
+            return result;
+        }
+
+        // ─── Sorties de séries récentes ────────────────────────────────────
+
+        private async Task<List<int>> DiscoverRecentSeriesAsync(
+            UserSeriesProfile profile, HashSet<int> existing)
+        {
+            const int months = 6;
+            var dateFrom = DateTime.UtcNow.AddMonths(-months).ToString("yyyy-MM-dd");
+            var dateTo = DateTime.UtcNow.ToString("yyyy-MM-dd");
+
+            var topGenres = profile.GenreWeights
+                .Where(g => g.Value > 0 && TvGenreIdMap.ContainsKey(g.Key))
+                .OrderByDescending(g => g.Value)
+                .Take(3)
+                .Select(g => TvGenreIdMap[g.Key])
+                .ToList();
+
+            var result = new List<int>();
+
+            if (topGenres.Any())
+            {
+                var genreParam = string.Join(",", topGenres);
+                result.AddRange(await FetchTmdbSeriesIdsAsync(
+                    $"discover/tv?with_genres={genreParam}" +
+                    $"&first_air_date.gte={dateFrom}" +
+                    $"&first_air_date.lte={dateTo}" +
+                    $"&sort_by=popularity.desc" +
+                    $"&vote_count.gte=20",
+                    existing, maxPages: 6));
+
+                Console.WriteLine($"[Discovery] Séries récentes: {result}");
+
+                await Task.Delay(150);
+            }
+
+            result.AddRange(await FetchTmdbSeriesIdsAsync(
+                $"discover/tv" +
+                $"?first_air_date.gte={dateFrom}" +
+                $"&first_air_date.lte={dateTo}" +
+                $"&sort_by=popularity.desc" +
+                $"&vote_count.gte=50" +
+                $"&vote_average.gte=6.0",
+                existing, maxPages: 8));
+
+            Console.WriteLine($"[Discovery] Séries récentes: {result.Count}");
+            return result;
+        }
+
+
+        private async Task<List<int>> FetchTmdbMovieIdsAsync(
+            string endpoint, HashSet<int> existing, int maxPages = 10)
+        {
+            var result = new List<int>();
+            var separator = endpoint.Contains('?') ? "&" : "?";
+
+            for (int page = 1; page <= maxPages; page++)
+            {
+                try
+                {
+                    var baseUrl = "https://api.themoviedb.org/3/";
+                    var url = $"{baseUrl}{endpoint}{separator}api_key={_apiKey}&language=fr-FR&page={page}";
+                    var res = await _tmdb.GetAsync(url);
+
+                    if (!res.IsSuccessStatusCode) break;
+
+                    var json = await res.Content.ReadAsStringAsync();
+                    var doc = JsonDocument.Parse(json);
+
+                    if (!doc.RootElement.TryGetProperty("results", out var results)) break;
+
+                    var ids = results.EnumerateArray()
+                        .Where(r => r.TryGetProperty("id", out _)
+                                 && r.TryGetProperty("media_type", out var mt)
+                                    ? mt.GetString() != "tv"  // exclut les séries
+                                    : true)
+                        .Select(r => r.GetProperty("id").GetInt32())
+                        .Where(id => !existing.Contains(id))
+                        .ToList();
+
+                    result.AddRange(ids);
+
+                    // Vérifie s'il y a d'autres pages
+                    if (!doc.RootElement.TryGetProperty("total_pages", out var totalPages)
+                        || page >= totalPages.GetInt32())
+                        break;
+
+                    await Task.Delay(100); // rate limit
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"[Discovery] Erreur TMDB ({endpoint} p{page}): {ex.Message}");
+                    break;
+                }
+            }
+
+            return result;
+        }
+        // ─── Source 1 — Recommendations + Similar depuis films aimés ─────
+
+        private async Task<List<int>> DiscoverFromLikedMoviesAsync(
+            Guid userId, HashSet<int> existing)
+        {
+            // ── 1. Derniers swipes droits (5 au lieu de 15) ───────────
+            var recentLikes = await _db.Swipes
+                .Include(s => s.Movie)
+                .Where(s => s.UserId == userId
+                         && s.Direction == SwipeDirection.Right
+                         && s.Movie != null)
+                .OrderByDescending(s => s.CreatedAt)
+                .Take(5)
+                .Select(s => s.Movie!.TmdbId)
+                .ToListAsync();
+
+            // ── 2. Films les mieux notés dans l'historique (5) ────────
+            var topRated = await _db.WatchHistory
+                .Include(w => w.Movie)
+                .Where(w => w.UserId == userId
+                         && w.Movie != null
+                         && w.UserRating.HasValue)
+                .OrderByDescending(w => w.UserRating)
+                .Take(5)
+                .Select(w => w.Movie!.TmdbId)
+                .ToListAsync();
+
+            // ── 3. Films favoris (5) ──────────────────────────────────
+            var favorites = await _db.WatchHistory
+                .Include(w => w.Movie)
+                .Where(w => w.UserId == userId
+                         && w.Movie != null
+                         && w.IsFavorite)
+                .OrderByDescending(w => w.LastWatchedAt)
+                .Take(5)
+                .Select(w => w.Movie!.TmdbId)
+                .ToListAsync();
+
+            // ── 4. Films bien regardés sans note explicite (5) ────────
+            // Fallback si pas assez de notes/favoris
+            var wellWatched = await _db.WatchHistory
+                .Include(w => w.Movie)
+                .Where(w => w.UserId == userId
+                         && w.Movie != null
+                         && w.Movie.RuntimeMinutes > 0)
+                .ToListAsync();
+
+            var wellWatchedIds = wellWatched
+                .Where(w => w.Movie!.RuntimeMinutes > 0 &&
+                    (float)w.WatchDurationSec /
+                    (w.Movie!.RuntimeMinutes!.Value * 60) >= 0.85f)
+                .OrderByDescending(w => w.LastWatchedAt)
+                .Take(5)
+                .Select(w => w.Movie!.TmdbId)
+                .ToList();
+
+            // ── Combine et déduplique les sources ─────────────────────
+            var allReference = recentLikes
+                .Concat(topRated)
+                .Concat(favorites)
+                .Concat(wellWatchedIds)
+                .Distinct()
+                .ToList();
+
+            Console.WriteLine($"[Discovery] Films de référence : " +
+                $"{recentLikes.Count} récents, " +
+                $"{topRated.Count} mieux notés, " +
+                $"{favorites.Count} favoris, " +
+                $"{wellWatchedIds.Count} bien regardés " +
+                $"→ {allReference.Count} uniques");
+
+            // ── Fetch recommendations + similar pour chaque ───────────
+            var result = new List<int>();
+
+            foreach (var tmdbId in allReference)
+            {
+                result.AddRange(await FetchTmdbMovieIdsAsync(
+                    $"movie/{tmdbId}/recommendations", existing, maxPages: 2));
+
+                result.AddRange(await FetchTmdbMovieIdsAsync(
+                    $"movie/{tmdbId}/similar", existing, maxPages: 1));
+
+                await Task.Delay(150);
+            }
+
+            Console.WriteLine($"[Discovery] Source 1 (diversifiée): {result.Count} films");
+            return result;
+        }
+
+        // ─── Source 2 — Discover par genres préférés ──────────────────────
+
+
+
+        private async Task<List<int>> DiscoverByGenresAsync(
+        UserProfile profile, HashSet<int> existing)
+            {
+                if (!profile.GenreWeights.Any()) return [];
+
+                // ✅ Langues acceptées — top 3 avec score > 0.2
+                var acceptedLangs = profile.OriginalLanguageWeights
+                    .Where(l => l.Value > 0.2f)
+                    .OrderByDescending(l => l.Value)
+                    .Take(3)
+                    .Select(l => l.Key)
+                    .ToList();
+
+                // Fallback si profil trop neuf
+                if (!acceptedLangs.Any())
+                    acceptedLangs = ["en", "fr"];
+
+                var langFilter = string.Join("|", acceptedLangs); // "de|en|fr|zh"
+
+                var allGenres = profile.GenreWeights
+                    .OrderByDescending(g => g.Value)
+                    .Where(g => GenreIdMap.ContainsKey(g.Key))
+                    .Select(g => GenreIdMap[g.Key])
+                    .ToList();
+
+                if (!allGenres.Any()) return [];
+
+                var result = new List<int>();
+
+                // Top 3 genres ensemble
+                var topGenres = allGenres.Take(3).ToList();
+                if (topGenres.Any())
+                {
+                    // ✅ with_original_language filtre les langues
+                    result.AddRange(await FetchTmdbMovieIdsAsync(
+                        $"discover/movie?with_genres={string.Join(",", topGenres)}&with_original_language={langFilter}&sort_by=vote_average.desc&vote_count.gte=100&vote_average.gte=6.5",
+                        existing, maxPages: 5));
+
+                    await Task.Delay(150);
+                }
+
+                // Genres 4-6 séparément
+                var extraGenres = allGenres.Skip(3).Take(3).ToList();
+                foreach (var genreId in extraGenres)
+                {
+                    result.AddRange(await FetchTmdbMovieIdsAsync(
+                        $"discover/movie?with_genres={genreId}&with_original_language={langFilter}&sort_by=vote_average.desc&vote_count.gte=100&vote_average.gte=6.5",
+                        existing, maxPages: 10));
+
+                    await Task.Delay(150);
+                }
+
+                Console.WriteLine($"[Discovery] Source 2 (genres+langues={langFilter}): {result.Count} films");
+                return result;
+        }
+
+        // ─── Source 3 — Discover par langue préférée ──────────────────────
+
+        private async Task<List<int>> DiscoverByLanguageAsync(
+            UserProfile profile, HashSet<int> existing)
+        {
+            if (!profile.OriginalLanguageWeights.Any()) return [];
+
+            var result = new List<int>();
+
+            // ✅ Top 2 langues (skip "en" seulement si d'autres existent)
+            var hasNonEnglish = profile.OriginalLanguageWeights
+                .Any(l => l.Key != "en");
+
+            var topLangs = profile.OriginalLanguageWeights
+                .OrderByDescending(l => l.Value)
+                .Where(l => !hasNonEnglish || l.Key != "en")
+                .Take(2)
+                .Select(l => l.Key)
+                .ToList();
+
+            foreach (var lang in topLangs)
+            {
+                // ✅ 2 pages par langue (40 films chacune)
+                result.AddRange(await FetchTmdbMovieIdsAsync(
+                    $"discover/movie?with_original_language={lang}&sort_by=vote_average.desc&vote_count.gte=50&vote_average.gte=6.0",
+                    existing, maxPages: 20));
+
+                await Task.Delay(150);
+            }
+
+            Console.WriteLine($"[Discovery] Source 3 (langues={string.Join(",", topLangs)}): {result.Count} films");
+            return result;
+        }
+
+        // ─── Source 4 — Discover par décennie préférée ────────────────────
+
+        private async Task<List<int>> DiscoverByDecadeAsync(
+            UserProfile profile, HashSet<int> existing)
+        {
+            if (!profile.PreferredDecadeWeights.Any()) return [];
+
+            // ✅ Top 3 décennies au lieu de 2
+            var topDecades = profile.PreferredDecadeWeights
+                .OrderByDescending(d => d.Value)
+                .Take(3)
+                .Select(d => d.Key)
+                .ToList();
+
+            var result = new List<int>();
+
+            foreach (var decade in topDecades)
+            {
+                if (!int.TryParse(decade, out var decadeYear)) continue;
+
+                var yearFrom = decadeYear;
+                var yearTo = decadeYear + 9;
+
+                // ✅ 2 pages par décennie (40 films chacune)
+                result.AddRange(await FetchTmdbMovieIdsAsync(
+                    $"discover/movie?primary_release_date.gte={yearFrom}-01-01&primary_release_date.lte={yearTo}-12-31&sort_by=vote_average.desc&vote_count.gte=100&vote_average.gte=7.0",
+                    existing, maxPages: 4));
+
+                await Task.Delay(150);
+            }
+
+            Console.WriteLine($"[Discovery] Source 4 (décennies): {result.Count} films");
+            return result;
+        }
+        private async Task<List<int>> DiscoverRecentReleasesAsync(
+        Guid userId, HashSet<int> existing, UserProfile profile, SectionProfile section)
+        {
+            var recent= section.ReleasedWithinMonths ?? 6; // fallback 6 mois si pas défini
+
+            var dateFrom = DateTime.UtcNow.AddMonths(-recent).ToString("yyyy-MM-dd");
+            var dateTo = DateTime.UtcNow.ToString("yyyy-MM-dd");
+
+            // ✅ Top 3 genres du profil → films récents dans ces genres
+            var topGenres = profile.GenreWeights
+                .Where(g => g.Value > 0 && GenreIdMap.ContainsKey(g.Key))
+                .OrderByDescending(g => g.Value)
+                .Take(3)
+                .Select(g => GenreIdMap[g.Key])
+                .ToList();
+
+            var result = new List<int>();
+
+            if (topGenres.Any())
+            {
+                var genreParam = string.Join(",", topGenres);
+                result.AddRange(await FetchTmdbMovieIdsAsync(
+                    $"discover/movie?with_genres={genreParam}" +
+                    $"&primary_release_date.gte={dateFrom}" +
+                    $"&primary_release_date.lte={dateTo}" +
+                    $"&sort_by=popularity.desc" +
+                    $"&vote_count.gte=20",
+                    existing, maxPages: 6));
+
+                await Task.Delay(150);
+            }
+
+            // ✅ Films récents populaires sans filtre genre (découverte large)
+            result.AddRange(await FetchTmdbMovieIdsAsync(
+                $"discover/movie" +
+                $"?primary_release_date.gte={dateFrom}" +
+                $"&primary_release_date.lte={dateTo}" +
+                $"&sort_by=popularity.desc" +
+                $"&vote_count.gte=50" +
+                $"&vote_average.gte=6.0",
+                existing, maxPages: 8));
+
+            // ✅ Langue préférée + récent
+            var topLang = profile.OriginalLanguageWeights
+                .Where(l => l.Value > 0.1f )
+                .OrderByDescending(l => l.Value)
+                .Select(l => l.Key)
+                .FirstOrDefault();
+
+            if (topLang != null)
+            {
+                result.AddRange(await FetchTmdbMovieIdsAsync(
+                    $"discover/movie" +
+                    $"?with_original_language={topLang}" +
+                    $"&primary_release_date.gte={dateFrom}" +
+                    $"&primary_release_date.lte={dateTo}" +
+                    $"&sort_by=popularity.desc" +
+                    $"&vote_count.gte=10",
+                    existing, maxPages: 3));
+            }
+
+            Console.WriteLine($"[Discovery] Sorties récentes: {result.Count} films");
+            return result;
         }
     }
 }

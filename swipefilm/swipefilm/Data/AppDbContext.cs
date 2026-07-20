@@ -8,8 +8,10 @@ public class AppDbContext : IdentityDbContext<User, IdentityRole<Guid>, Guid>
 {
     public AppDbContext(DbContextOptions<AppDbContext> options) : base(options) { }
 
-    public DbSet<UserServer> UserServers => Set<UserServer>();
+    public DbSet<ServerConfig> ServerConfig => Set<ServerConfig>();
     public DbSet<UserSeerr> UserSeerr => Set<UserSeerr>();
+    public DbSet<UserRadarr> UserRadarr => Set<UserRadarr>();
+    public DbSet<UserSonarr> UserSonarr => Set<UserSonarr>();
     public DbSet<Movie> Movies => Set<Movie>();
     public DbSet<WatchHistory> WatchHistory => Set<WatchHistory>();
     public DbSet<Swipe> Swipes => Set<Swipe>();
@@ -17,9 +19,22 @@ public class AppDbContext : IdentityDbContext<User, IdentityRole<Guid>, Guid>
     public DbSet<Session> Sessions => Set<Session>();
     public DbSet<SessionMember> SessionMembers => Set<SessionMember>();
     public DbSet<SessionMatch> SessionMatches => Set<SessionMatch>();
-    public DbSet<Request> Requests => Set<Request>();
+    // ✅ Remplace l'ancien Request par MediaRequest
+    public DbSet<MediaRequest> MediaRequests => Set<MediaRequest>();
+    public DbSet<MediaRequestSeason> MediaRequestSeasons => Set<MediaRequestSeason>();
     public DbSet<UserProfile> UserProfiles => Set<UserProfile>();
     public DbSet<ServerMovie> ServerMovie => Set<ServerMovie>();
+    public DbSet<DiscoveryCache> DiscoveryCaches => Set<DiscoveryCache>();
+    public DbSet<AppSettings> AppSettings => Set<AppSettings>();
+
+    // ─── Séries ─────────────────────────────────────────────────
+    public DbSet<Series> Series => Set<Series>();
+    public DbSet<SeriesSeason> SeriesSeasons => Set<SeriesSeason>();
+    public DbSet<ServerSeries> ServerSeries => Set<ServerSeries>();
+    public DbSet<ServerSeriesSeason> ServerSeriesSeasons => Set<ServerSeriesSeason>();
+    public DbSet<SeriesWatchHistory> SeriesWatchHistory => Set<SeriesWatchHistory>();
+    public DbSet<UserSeriesProfile> UserSeriesProfiles => Set<UserSeriesProfile>();
+
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

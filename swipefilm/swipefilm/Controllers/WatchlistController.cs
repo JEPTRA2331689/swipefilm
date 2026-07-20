@@ -19,16 +19,15 @@ namespace swipefilm.Controllers
         private Guid CurrentUserId =>
             Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
 
-        [HttpGet("{serverId}")]
-        public async Task<IActionResult> GetWatchlist(Guid serverId)
+        [HttpGet]
+        public async Task<IActionResult> GetWatchlist()
         {
             // ✅ Films swipés à droite
-            var swipedRight = await _db.Swipes
+            var swipedMovies = await _db.Swipes
                 .Include(s => s.Movie)
                 .Where(s => s.UserId == CurrentUserId
                          && s.Direction == SwipeDirection.Right
                          && s.Movie != null)
-                .OrderByDescending(s => s.CreatedAt)
                 .Select(s => new
                 {
                     s.Movie!.Id,
@@ -39,26 +38,56 @@ namespace swipefilm.Controllers
                     s.Movie.TmdbRating,
                     s.Movie.RuntimeMinutes,
                     s.Movie.Genres,
-                    s.Movie.ReleaseDate,
+                    ReleaseDate = s.Movie.ReleaseDate,
                     s.Movie.ContentType,
                     SwipedAt = s.CreatedAt,
                     IsAvailable = _db.ServerMovie
-                        .Any(sm => sm.ServerId == serverId
-                               && sm.MovieId == s.Movie!.Id),
+                        .Any(sm => sm.MovieId == s.Movie!.Id),
                 })
                 .ToListAsync();
 
-            return Ok(swipedRight);
+            // ✅ Séries swipées à droite — manquait entièrement avant ce correctif
+            var swipedSeries = await _db.Swipes
+                .Include(s => s.Series)
+                .Where(s => s.UserId == CurrentUserId
+                         && s.Direction == SwipeDirection.Right
+                         && s.Series != null)
+                .Select(s => new
+                {
+                    s.Series!.Id,
+                    s.Series.TmdbId,
+                    s.Series.Title,
+                    s.Series.PosterPath,
+                    s.Series.Overview,
+                    s.Series.TmdbRating,
+                    RuntimeMinutes = (int?)null,
+                    s.Series.Genres,
+                    ReleaseDate = s.Series.FirstAirDate,
+                    ContentType = "series",
+                    SwipedAt = s.CreatedAt,
+                    IsAvailable = _db.ServerSeries
+                        .Any(ss => ss.SeriesId == s.Series!.Id),
+                })
+                .ToListAsync();
+
+            // ✅ Mêmes noms/types de propriétés dans le même ordre des deux côtés
+            // → même type anonyme généré par le compilateur, Concat direct.
+            var merged = swipedMovies
+                .Concat(swipedSeries)
+                .OrderByDescending(w => w.SwipedAt)
+                .ToList();
+
+            return Ok(merged);
         }
 
-        [HttpDelete("{movieId}")]
-        public async Task<IActionResult> RemoveFromWatchlist(Guid movieId)
+        [HttpDelete("{id}")]
+        public async Task<IActionResult> RemoveFromWatchlist(Guid id)
         {
-            // Supprime le swipe droit pour retirer de la watchlist
+            // Supprime le swipe droit pour retirer de la watchlist — film ou série
             var swipe = await _db.Swipes
                 .FirstOrDefaultAsync(s => s.UserId == CurrentUserId
-                                       && s.MovieId == movieId
-                                       && s.Direction == SwipeDirection.Right);
+                                       && s.Direction == SwipeDirection.Right
+                                       && (s.MovieId == id || s.SeriesId == id));
 
             if (swipe is null) return NotFound();
 

@@ -1,4 +1,5 @@
-﻿using Hangfire;
+﻿// swipefilm/Auth/SyncBackgroundService.cs
+using Hangfire;
 using Microsoft.EntityFrameworkCore;
 using swipefilm.Auth.swipefilm.Services;
 using swipefilm.Data;
@@ -11,6 +12,7 @@ namespace swipefilm.Auth
         private readonly IServiceProvider _services;
         private readonly ILogger<SyncBackgroundJobService> _logger;
 
+        // ✅ Plus de _db injecté — AppDbContext est Scoped, créé dans le scope
         public SyncBackgroundJobService(
             IServiceProvider services,
             ILogger<SyncBackgroundJobService> logger)
@@ -19,74 +21,82 @@ namespace swipefilm.Auth
             _logger = logger;
         }
 
-        // ─── Sync tous les serveurs ───────────────────────────────────
+        // ✅ Un seul serveur pour toute l'instance — plus une boucle sur N
+        // serveurs, juste un alias vers l'unique sync (gardé pour ne pas
+        // avoir à changer l'enregistrement du cron dans Program.cs).
+        public Task SyncAllServersAsync() => SyncSingleServerAsync();
 
-        public async Task SyncAllServersAsync()
+        public async Task SyncSingleServerAsync()
         {
             using var scope = _services.CreateScope();
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
 
-            var servers = await db.UserServers
-                .Where(s => s.IsActive)
-                .ToListAsync();
-
-            _logger.LogInformation(
-                "[Hangfire] Sync démarrée pour {Count} serveurs", servers.Count);
-
-            foreach (var server in servers)
-            {
-                try
-                {
-                    // ✅ Enqueue sans queue spécifique
-                    BackgroundJob.Enqueue<SyncBackgroundJobService>(
-                        x => x.SyncSingleServerAsync(server.Id));
-
-                    // ✅ Enqueue avec queue spécifique
-                    BackgroundJob.Enqueue<SyncBackgroundJobService>(
-                        "default",
-                        x => x.SyncSingleServerAsync(server.Id));
-                }
-                catch (Exception ex)
-                {
-                    _logger.LogError(ex,
-                        "[Hangfire] Erreur enqueue serveur {Name}",
-                        server.FriendlyName);
-                }
-            }
-        }
-
-        // ─── Sync un serveur spécifique ───────────────────────────────
-
-        public async Task SyncSingleServerAsync(Guid serverId)
-        {
-            using var scope = _services.CreateScope();
-            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-
-            var server = await db.UserServers.FindAsync(serverId);
-            if (server is null || !server.IsActive) return;
+            var server = await db.ServerConfig.FirstOrDefaultAsync();
+            if (server is null) return;
 
             IMediaServerService mediaService = server.Type == ServerType.Jellyfin
                 ? scope.ServiceProvider.GetRequiredService<JellyfinService>()
                 : scope.ServiceProvider.GetRequiredService<PlexService>();
 
-            var syncService = new SyncService(db, scope.ServiceProvider);
+            // ✅ SyncService sans injection — stateless
+            var syncService = new SyncService();
 
-            // ✅ Sync incrémentale — passe LastSyncAt
-            await syncService.SyncServerAsync(server, mediaService, server.LastSyncAt);
+            await syncService.SyncServerAsync(
+                server, mediaService, server.LastSyncAt, db);
 
-            // ✅ Enrichir les nouveaux films après la sync
             var tmdbService = scope.ServiceProvider.GetRequiredService<TmdbService>();
             await tmdbService.EnrichAllMoviesAsync();
 
-            // ✅ Sync statuts Seerr
-            var seerrService = scope.ServiceProvider.GetRequiredService<SeerrService>();
-            await seerrService.SyncRequestStatusesAsync(server.UserId);
+            // ✅ C'est ici, juste après le scan Jellyfin/Plex, qu'on sait ce
+            // qui est réellement lisible — c'est ce qui confirme le passage
+            // Downloading → Available/PartiallyAvailable, pour tout le monde.
+            var requestService = scope.ServiceProvider.GetRequiredService<MediaRequestService>();
+            await requestService.ConfirmAvailabilityAsync();
 
             _logger.LogInformation(
                 "[Hangfire] Sync terminée pour {Name}", server.FriendlyName);
         }
 
-        // ─── Discovery pour tous les users ───────────────────────────
+        /// <summary>
+        /// Enchaîne sync + calcul du profil + discover pour un utilisateur qui
+        /// vient d'être importé (setup initial ou import ultérieur) — pour
+        /// qu'il ait des recommandations dès sa première visite, pas après le
+        /// prochain passage du job de sync horaire.
+        /// </summary>
+        public async Task OnboardNewUserAsync(Guid userId)
+        {
+            await SyncSingleServerAsync();
+
+            using var scope = _services.CreateScope();
+            var engine = scope.ServiceProvider.GetRequiredService<RecommendationEngine>();
+            await engine.UpdateProfileFromHistoryAsync(userId);
+            await engine.UpdateSeriesProfileFromHistoryAsync(userId);
+
+            var discovery = scope.ServiceProvider.GetRequiredService<PersonalizedDiscoveryService>();
+            await discovery.DiscoverForUserAsync(userId);
+
+            _logger.LogInformation(
+                "[Hangfire] Onboarding (sync + profil + discover) terminé pour user {UserId}", userId);
+        }
+
+        /// <summary>
+        /// Filet de sécurité derrière les webhooks Radarr/Sonarr — au cas où
+        /// un événement serait manqué (webhook down, Radarr redémarré...).
+        /// </summary>
+        public async Task SyncAllRequestStatusesAsync()
+        {
+            using var scope = _services.CreateScope();
+            var requestService = scope.ServiceProvider.GetRequiredService<MediaRequestService>();
+
+            try
+            {
+                await requestService.SyncRequestStatusesAsync();
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "[Hangfire] Erreur sync statuts requêtes");
+            }
+        }
 
         public async Task DiscoverForAllUsersAsync()
         {

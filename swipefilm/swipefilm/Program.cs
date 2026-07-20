@@ -6,11 +6,38 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Npgsql;
+using Serilog;
+using Serilog.Formatting.Json;
 using swipefilm.Auth;
 using swipefilm.Auth.swipefilm.Services;
 using swipefilm.Data;
 
 var builder = WebApplication.CreateBuilder(args);
+
+// ✅ Un fichier par jour, JSON (une ligne = un événement) — lu tel quel par
+// GET /api/logs, pas de parsing de format texte fragile. Même principe que
+// Winston chez Overseerr (transport "machinelogs").
+var logsDirectory = Path.Combine(builder.Environment.ContentRootPath, "logs");
+builder.Host.UseSerilog((context, configuration) => configuration
+    .MinimumLevel.Information()
+    .WriteTo.Console()
+    .WriteTo.File(
+        new JsonFormatter(renderMessage: true),
+        Path.Combine(logsDirectory, "swipefilm-.json"),
+        rollingInterval: RollingInterval.Day,
+        retainedFileCountLimit: 7,
+        fileSizeLimitBytes: 20 * 1024 * 1024));
+
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy("AllowAll", policy =>
+    {
+        policy
+            .AllowAnyOrigin()
+            .AllowAnyMethod()
+            .AllowAnyHeader();
+    });
+});
 
 // ─── PostgreSQL + EF ──────────────────────────────────────────
 var dataSourceBuilder = new NpgsqlDataSourceBuilder(
@@ -21,6 +48,10 @@ var dataSource = dataSourceBuilder.Build();
 builder.Services.AddDbContext<AppDbContext>(options =>
     options.UseNpgsql(dataSource,
         npgsql => npgsql.MigrationsAssembly("swipefilm")));
+
+builder.Services.AddDbContextFactory<AppDbContext>(options =>
+    options.UseNpgsql(dataSource,
+        npgsql => npgsql.MigrationsAssembly("swipefilm")),ServiceLifetime.Scoped);
 
 // ─── Identity ─────────────────────────────────────────────────
 builder.Services.AddIdentity<User, IdentityRole<Guid>>(options =>
@@ -117,21 +148,27 @@ builder.Services.AddSignalR();
 // ─── Services ─────────────────────────────────────────────────
 builder.Services.AddScoped<AuthManager>();
 builder.Services.AddScoped<IEncryptionService, EncryptionService>();
-builder.Services.AddScoped<IUserServerService, UserServerService>();
+builder.Services.AddScoped<IServerConfigService, ServerConfigService>();
 builder.Services.AddScoped<JellyfinService>();
 builder.Services.AddScoped<PlexService>();
 builder.Services.AddScoped<SyncService>();
 builder.Services.AddScoped<TmdbService>();
 builder.Services.AddScoped<RecommendationEngine>();
-builder.Services.AddScoped<SeerrService>();
 builder.Services.AddScoped<PersonalizedDiscoveryService>();
 builder.Services.AddScoped<SyncBackgroundJobService>();
+builder.Services.AddScoped<RadarrService>();
+builder.Services.AddScoped<SonarrService>();
+builder.Services.AddScoped<MediaRequestService>();
+builder.Services.AddMemoryCache();
+
 
 // ─── HttpClients ──────────────────────────────────────────────
 builder.Services.AddHttpClient("Jellyfin");
 builder.Services.AddHttpClient("Plex");
 builder.Services.AddHttpClient("Tmdb");
 builder.Services.AddHttpClient("Seerr");
+builder.Services.AddHttpClient("Radarr");
+builder.Services.AddHttpClient("Sonarr");
 
 // ════════════════════════════════════════════════════════════════
 var app = builder.Build();
@@ -143,15 +180,34 @@ using (var scope = app.Services.CreateScope())
     var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
     await db.Database.MigrateAsync();
 }
+using (var scope = app.Services.CreateScope())
+{
+    var roleManager = scope.ServiceProvider
+        .GetRequiredService<RoleManager<IdentityRole<Guid>>>();
+
+    foreach (var role in new[] { "Admin", "User" })
+    {
+        if (!await roleManager.RoleExistsAsync(role))
+            await roleManager.CreateAsync(new IdentityRole<Guid>(role));
+    }
+}
 
 // ─── Pipeline ─────────────────────────────────────────────────
+app.UseSerilogRequestLogging(); // ✅ un log par requête HTTP (méthode, chemin, code, durée)
+
 if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();
     app.UseSwaggerUI();
 }
 
-app.UseHttpsRedirection();
+// ✅ Exclu /api/webhooks/* — Radarr/Sonarr n'ont pas forcément un certificat
+// HTTPS de confiance vers ce serveur, la redirection les renverrait droit
+// dans le même mur SSL. Le token en query string reste la sécurité de ces routes.
+app.UseWhen(
+    context => !context.Request.Path.StartsWithSegments("/api/webhooks"),
+    branch => branch.UseHttpsRedirection());
+app.UseCors("AllowAll"); // ← ajoute ici
 app.UseAuthentication(); // ← doit être avant UseAuthorization
 app.UseAuthorization();
 
@@ -163,11 +219,13 @@ app.UseHangfireDashboard("/hangfire", new DashboardOptions
 });
 
 // ─── Jobs planifiés ───────────────────────────────────────────
+// ✅ Toutes les 5 min — c'est aussi ce qui confirme la vraie disponibilité
+// (ServerMovie/ServerSeries) des requêtes en Downloading, voir SyncSingleServerAsync
 RecurringJob.AddOrUpdate<SyncBackgroundJobService>(
     "sync-all-servers",
-    "default",
     x => x.SyncAllServersAsync(),
-    Cron.Hourly);
+    "*/5 * * * *",
+    new RecurringJobOptions { QueueName = "default" });
 
 RecurringJob.AddOrUpdate<TmdbService>(
     "enrich-movies",
@@ -180,6 +238,13 @@ RecurringJob.AddOrUpdate<SyncBackgroundJobService>(
     "low",
     x => x.DiscoverForAllUsersAsync(),
     "0 3 * * *");
+
+// ✅ Filet de sécurité derrière les webhooks Radarr/Sonarr (toutes les 30 min)
+RecurringJob.AddOrUpdate<SyncBackgroundJobService>(
+    "sync-request-statuses",
+    x => x.SyncAllRequestStatusesAsync(),
+    "*/30 * * * *",
+    new RecurringJobOptions { QueueName = "default" });
 
 // ─── Routes ───────────────────────────────────────────────────
 app.MapControllers();

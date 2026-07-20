@@ -1,69 +1,81 @@
-﻿using System.Security.Claims;
+// swipefilm/Controllers/UserServerController.cs
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using swipefilm.Auth;
+using swipefilm.Models;
 
 namespace swipefilm.Controllers
 {
-    // SwipeFilm.API/Controllers/UserServerController.cs
+    // ✅ Un seul serveur pour toute l'instance — plus une liste par
+    // utilisateur. Seul un admin peut le configurer/resynchroniser.
     [ApiController]
     [Route("api/servers")]
     [Authorize]
+    [RequirePermission(Permission.Admin)]
     public class UserServerController : ControllerBase
     {
-        private readonly IUserServerService _serverService;
+        private readonly IServerConfigService _serverService;
 
-        public UserServerController(IUserServerService serverService)
+        public UserServerController(IServerConfigService serverService)
         {
             _serverService = serverService;
         }
 
-        private Guid CurrentUserId =>
-            Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
-
         [HttpGet]
-        public async Task<IActionResult> GetServers()
+        public async Task<IActionResult> GetServer()
         {
-            var servers = await _serverService.GetServersAsync(CurrentUserId);
+            var server = await _serverService.GetConfigAsync();
+            if (server is null) return Ok((object?)null);
 
-            // ⚠️ On ne retourne JAMAIS les champs chiffrés au client
-            return Ok(servers.Select(s => new
+            return Ok(new
             {
-                s.Id,
-                s.FriendlyName,
-                s.Type,
-                s.IsActive,
-                s.LastSyncAt,
-                s.CreatedAt
-            }));
+                server.Id,
+                server.FriendlyName,
+                server.Type,
+                server.LastSyncAt,
+                server.CreatedAt
+            });
         }
 
         [HttpPost]
-        public async Task<IActionResult> AddServer([FromBody] AddServerDto dto)
+        public async Task<IActionResult> ConfigureServer([FromBody] AddServerDto dto)
         {
             try
             {
-                var server = await _serverService.AddServerAsync(CurrentUserId, dto);
-                return Ok(new { server.Id, server.FriendlyName, server.Type });
+                var server = await _serverService.ConfigureAsync(dto);
+                return Ok(new
+                {
+                    server.Id,
+                    server.FriendlyName,
+                    server.Type,
+                    Message = "Serveur configuré — synchronisation démarrée en arrière-plan"
+                });
             }
             catch (InvalidOperationException ex)
             {
-                return BadRequest(ex.Message);
+                return BadRequest(new { Error = ex.Message });
             }
         }
 
-        [HttpDelete("{serverId}")]
-        public async Task<IActionResult> DeleteServer(Guid serverId)
+        // ✅ Test de connexion sans sauvegarder
+        [HttpPost("test")]
+        public async Task<IActionResult> TestConnection([FromBody] TestConnectionDto dto)
         {
-            try
-            {
-                await _serverService.DeleteServerAsync(CurrentUserId, serverId);
-                return NoContent();
-            }
-            catch (KeyNotFoundException)
-            {
-                return NotFound();
-            }
+            var ok = await _serverService.TestConnectionAsync(dto);
+            return ok
+                ? Ok(new { Success = true, Message = "Connexion réussie" })
+                : BadRequest(new { Success = false, Message = "Connexion impossible" });
+        }
+
+        [HttpPost("sync")]
+        public IActionResult TriggerSync()
+        {
+            // ✅ Déclenche une sync manuelle immédiate
+            Hangfire.BackgroundJob.Enqueue<SyncBackgroundJobService>(
+                "default",
+                x => x.SyncSingleServerAsync());
+
+            return Ok(new { Message = "Synchronisation démarrée" });
         }
     }
 }

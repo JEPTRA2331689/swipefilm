@@ -6,7 +6,6 @@ namespace swipefilm.Models
     {
         public Guid Id { get; set; }
         public Guid UserId { get; set; }
-        public Guid ServerId { get; set; }
         public Guid MovieId { get; set; }
 
         // Données brutes de Plex/Jellyfin
@@ -32,7 +31,6 @@ namespace swipefilm.Models
 
         // Navigation
         public User User { get; set; } = null!;
-        public UserServer Server { get; set; } = null!;
         public Movie Movie { get; set; } = null!;
         public string? ContentHash { get; set; }
     }

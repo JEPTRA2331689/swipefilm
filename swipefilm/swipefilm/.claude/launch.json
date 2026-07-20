@@ -1,0 +1,17 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "api",
+      "runtimeExecutable": "dotnet",
+      "runtimeArgs": ["run", "--urls", "http://localhost:5250"],
+      "port": 5250
+    },
+    {
+      "name": "web",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["--prefix", "C:\\Users\\jephtance\\Desktop\\swipefilm\\swipefilmNextjs\\swipefilm-web", "run", "dev"],
+      "port": 3000
+    }
+  ]
+}

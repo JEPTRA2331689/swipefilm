@@ -29,14 +29,20 @@ namespace swipefilm.Controllers
         [HttpPost]
         public async Task<IActionResult> Swipe([FromBody] SwipeDto dto)
         {
-            var movie = await _db.Movies.FindAsync(dto.MovieId);
-            if (movie is null) return NotFound();
+            if ((dto.MovieId is null) == (dto.SeriesId is null))
+                return BadRequest(new { error = "Il faut renseigner soit MovieId soit SeriesId, jamais les deux ni aucun" });
+
+            if (dto.MovieId.HasValue && await _db.Movies.FindAsync(dto.MovieId.Value) is null)
+                return NoContent();
+            if (dto.SeriesId.HasValue && await _db.Series.FindAsync(dto.SeriesId.Value) is null)
+                return NoContent();
 
             _db.Swipes.Add(new Swipe
             {
                 Id = Guid.NewGuid(),
                 UserId = CurrentUserId,
                 MovieId = dto.MovieId,
+                SeriesId = dto.SeriesId,
                 Direction = dto.Direction,
                 DurationMs = dto.DurationMs,
                 ContextMode = dto.Context,
@@ -45,21 +51,22 @@ namespace swipefilm.Controllers
 
             await _db.SaveChangesAsync();
 
-            // ✅ Tous les paramètres passés correctement
             var userId = CurrentUserId;
-            var movieId = dto.MovieId;
             var direction = dto.Direction;
             var durationMs = dto.DurationMs;
 
-            _ = Task.Run(async () =>
-                await _engine.UpdateProfileAsync(userId, movieId, direction, durationMs));
+            if (dto.MovieId.HasValue)
+                _engine.FireAndForgetProfileUpdate(userId, dto.MovieId.Value, direction, durationMs);
+            else
+                _engine.FireAndForgetSeriesProfileUpdate(userId, dto.SeriesId!.Value, direction, durationMs);
 
             return Ok(new { message = "Swipe enregistré ✅" });
         }
     }
 
     public record SwipeDto(
-        Guid MovieId,
+        Guid? MovieId,
+        Guid? SeriesId,
         SwipeDirection Direction,
         int DurationMs,
         SwipeContext Context

@@ -25,6 +25,8 @@
             new Claim(ClaimTypes.NameIdentifier, user.Id.ToString()),
             new Claim(ClaimTypes.Email, user.Email!),
             new Claim(ClaimTypes.Name, user.DisplayName),
+            new Claim("permissions", user.Permissions.ToString()),
+            new Claim("isAdmin", user.IsAdmin.ToString().ToLower()),
             new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString())
         };
 
@@ -38,6 +40,12 @@
             );
 
             return new JwtSecurityTokenHandler().WriteToken(token);
+        }
+        /// <summary>Lit les permissions depuis les claims du token actuel</summary>
+        public static long GetPermissions(ClaimsPrincipal user)
+        {
+            var permClaim = user.FindFirstValue("permissions");
+            return long.TryParse(permClaim, out var perms) ? perms : 0;
         }
     }
 }

@@ -38,21 +38,16 @@ namespace swipefilm.Controllers
             Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
 
 
-        [HttpPost("{serverId}")]
-        public async Task<IActionResult> SyncServer(Guid serverId)
+        [HttpPost]
+        public async Task<IActionResult> SyncServer()
         {
-            var server = await _db.UserServers
-                .FirstOrDefaultAsync(s =>
-                    s.Id == serverId &&
-                    s.UserId == CurrentUserId &&
-                    s.IsActive);
-
+            var server = await _db.ServerConfig.FirstOrDefaultAsync();
             if (server is null) return NotFound();
 
             // ✅ Queue "critical" pour les syncs manuelles
             var jobId = BackgroundJob.Enqueue<SyncBackgroundJobService>(
                 "critical",
-                x => x.SyncSingleServerAsync(serverId));
+                x => x.SyncSingleServerAsync());
 
             return Ok(new
             {

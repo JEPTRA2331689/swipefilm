@@ -22,6 +22,20 @@ namespace swipefilm.Data.Configurations
                 .HasColumnType("jsonb");
             builder.Property(p => p.KeywordWeights)
                 .HasColumnType("jsonb");
+            builder.Property(p => p.OriginalLanguageWeights)
+                .HasColumnType("jsonb");
+            builder.Property(p => p.PreferredDecadeWeights)
+                .HasColumnType("jsonb");
+            builder.Property(p => p.GenreCounts)
+                .HasColumnType("jsonb");
+            builder.Property(p => p.DirectorCounts)
+                .HasColumnType("jsonb");
+            builder.Property(p => p.ActorCounts)
+                .HasColumnType("jsonb");
+            builder.Property(p => p.KeywordCounts)
+                .HasColumnType("jsonb");
+            builder.Property(p => p.LanguageCounts)
+                .HasColumnType("jsonb");
 
             builder.HasOne(p => p.User)
                 .WithOne(u => u.Profile)

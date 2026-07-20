@@ -443,3 +443,91 @@ FodyWeavers.xsd
 *.msix
 *.msm
 *.msp
+
+## Build outputs and compilation artifacts
+[Bb]in/
+[Oo]bj/
+[Log]/
+
+## IDE and Editor Specific Files
+# Visual Studio
+.vs/
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+
+# Visual Studio Code
+.vscode/
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+*.code-workspace
+
+# JetBrains Rider
+.idea/
+*.sln.iml
+
+## Operating System files
+Thumbs.db
+.DS_Store
+
+## Environment variables and local secrets
+.env
+.env*.local
+appsettings.Development.json
+
+# Dependencies
+/node_modules
+/.pnp
+.pnp.js
+
+# Next.js Build and Cache
+/.next/
+/out/
+
+# Production Build
+/build
+
+# Testing
+/coverage
+
+# Debugging Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Local Environment Variables (Never commit secrets!)
+.env*.local
+.env
+
+# Vercel Deployment
+.vercel
+
+# TypeScript
+*.tsbuildinfo
+next-env.d.ts
+
+# IDEs and Editors
+.vscode/
+.idea/
+
+# System Files
+.DS_Store
+*.pem
+
+# .NET build output (patterns above only cover bin/x64, bin/x86)
+bin/
+obj/
+
+# Claude Code local-only settings/state (per-machine, not shared)
+.claude/settings.local.json
+.claude/scheduled_tasks.lock
+
+# Serilog rolling file logs
+logs/
+
+# Archives (backups, exports — not meant to be versioned)
+*.zip

@@ -1,4 +1,4 @@
-﻿using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 using swipefilm.Models;
 
@@ -10,15 +10,10 @@ namespace swipefilm.Data.Configurations
         {
             builder.HasKey(sm => sm.Id);
 
-            // Index composite — évite les doublons
-            builder.HasIndex(sm => new { sm.ServerId, sm.MovieId })
+            // Une seule ligne par film — fait système, plus par serveur.
+            builder.HasIndex(sm => sm.MovieId)
                 .IsUnique()
-                .HasDatabaseName("idx_servermovie_server_movie");
-
-            builder.HasOne(sm => sm.Server)
-                .WithMany()
-                .HasForeignKey(sm => sm.ServerId)
-                .OnDelete(DeleteBehavior.Cascade);
+                .HasDatabaseName("idx_servermovie_movie");
 
             builder.HasOne(sm => sm.Movie)
                 .WithMany()

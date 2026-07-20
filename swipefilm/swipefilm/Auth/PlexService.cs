@@ -4,11 +4,11 @@ namespace swipefilm.Auth
 {
     public class PlexService : IMediaServerService
     {
-        private readonly IUserServerService _serverService;
+        private readonly IServerConfigService _serverService;
         private readonly HttpClient _http;
 
         public PlexService(
-            IUserServerService serverService,
+            IServerConfigService serverService,
             IHttpClientFactory httpClientFactory)
         {
             _serverService = serverService;
@@ -17,14 +17,14 @@ namespace swipefilm.Auth
 
         // ─── Bibliothèque ─────────────────────────────────────────────
 
-        public async Task<List<MediaItem>> GetLibraryAsync(Guid serverId)
-            => await GetLibraryIncrementalAsync(serverId, null);
+        public async Task<List<MediaItem>> GetLibraryAsync(string? userId)
+            => await GetLibraryIncrementalAsync(null, null);
 
         public async Task<List<MediaItem>> GetLibraryIncrementalAsync(
-            Guid serverId, DateTime? since)
+            DateTime? since, string? userId)
         {
             var (url, token) = await _serverService
-                .GetDecryptedCredentialsAsync(serverId);
+                .GetDecryptedCredentialsAsync();
 
             var sections = await GetLibrarySectionsAsync(url, token);
             var items = new List<MediaItem>();
@@ -42,6 +42,28 @@ namespace swipefilm.Auth
                     : $"[Plex] Sync complète : {items.Count} items");
 
             return items;
+        }
+
+        // ✅ Nécessaire pour construire un lien direct vers une fiche
+        // (app.plex.tv/desktop#!/server/{machineIdentifier}/...) — récupéré
+        // une fois et mis en cache sur ServerConfig.MachineIdentifier.
+        public async Task<string?> GetMachineIdentifierAsync()
+        {
+            var (url, token) = await _serverService.GetDecryptedCredentialsAsync();
+
+            try
+            {
+                var response = await _http.GetAsync($"{url}/?X-Plex-Token={token}");
+                if (!response.IsSuccessStatusCode) return null;
+
+                var doc = XDocument.Parse(await response.Content.ReadAsStringAsync());
+                return doc.Root?.Attribute("machineIdentifier")?.Value;
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[Plex] GetMachineIdentifier erreur: {ex.Message}");
+                return null;
+            }
         }
 
         private async Task<List<(string Key, string Type)>> GetLibrarySectionsAsync(
@@ -142,14 +164,14 @@ namespace swipefilm.Auth
 
         // ─── Historique ───────────────────────────────────────────────
 
-        public async Task<List<WatchHistoryItem>> GetWatchHistoryAsync(Guid serverId)
-            => await GetWatchHistoryIncrementalAsync(serverId, null);
+        public async Task<List<WatchHistoryItem>> GetWatchHistoryAsync(string? userId)
+            => await GetWatchHistoryIncrementalAsync(null, null);
 
         public async Task<List<WatchHistoryItem>> GetWatchHistoryIncrementalAsync(
-            Guid serverId, DateTime? since)
+            DateTime? since, string? userId)
         {
             var (url, token) = await _serverService
-                .GetDecryptedCredentialsAsync(serverId);
+                .GetDecryptedCredentialsAsync();
 
             var items = new List<WatchHistoryItem>();
             int start = 0;
@@ -308,12 +330,65 @@ namespace swipefilm.Auth
             return (viewCount, userRating, tmdbId, isFavorite);
         }
 
+        // ─── Saisons ──────────────────────────────────────────────────
+
+        public async Task<List<SeasonItem>> GetSeasonsAsync(
+            string seriesServerId, string? userId)
+        {
+            var (url, token) = await _serverService.GetDecryptedCredentialsAsync();
+
+            var response = await _http.GetAsync(
+                $"{url}/library/metadata/{seriesServerId}/children" +
+                $"?X-Plex-Token={token}");
+
+            if (!response.IsSuccessStatusCode) return [];
+
+            var doc = XDocument.Parse(await response.Content.ReadAsStringAsync());
+            var seasons = new List<SeasonItem>();
+
+            foreach (var season in doc.Descendants("Directory"))
+            {
+                var ratingKey = season.Attribute("ratingKey")?.Value;
+                if (ratingKey is null) continue;
+
+                var seasonNumber = int.TryParse(season.Attribute("index")?.Value, out var idx)
+                    ? idx : 0;
+
+                var episodeCount = int.TryParse(season.Attribute("leafCount")?.Value, out var lc)
+                    ? lc : 0;
+
+                var watchedCount = int.TryParse(season.Attribute("viewedLeafCount")?.Value, out var vlc)
+                    ? vlc : 0;
+
+                DateTime lastViewed = DateTime.UtcNow;
+                if (long.TryParse(season.Attribute("lastViewedAt")?.Value, out var viewedAt))
+                    lastViewed = DateTimeOffset.FromUnixTimeSeconds(viewedAt).UtcDateTime;
+
+                // Plex n'a pas de favori natif au niveau saison
+                var hash = ComputeHash(watchedCount, episodeCount, false, null);
+
+                seasons.Add(new SeasonItem(
+                    ServerId: ratingKey,
+                    SeasonNumber: seasonNumber,
+                    EpisodeCount: episodeCount,
+                    WatchedEpisodeCount: watchedCount,
+                    IsFavorite: false,
+                    UserRating: null,
+                    LastWatchedAt: lastViewed,
+                    FirstWatchedAt: lastViewed,
+                    ContentHash: hash
+                ));
+            }
+
+            return seasons;
+        }
+
         // ─── Stream URL ───────────────────────────────────────────────
 
-        public async Task<string> GetStreamUrlAsync(Guid serverId, string itemId)
+        public async Task<string> GetStreamUrlAsync(string itemId)
         {
             var (url, token) = await _serverService
-                .GetDecryptedCredentialsAsync(serverId);
+                .GetDecryptedCredentialsAsync();
 
             return $"{url}/library/parts/{itemId}/file?X-Plex-Token={token}";
         }

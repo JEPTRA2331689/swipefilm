@@ -1,0 +1,295 @@
+namespace swipefilm.Models
+{
+    public class Movie
+    {
+        public Guid Id { get; set; }
+        public int TmdbId { get; set; }
+        public string Title { get; set; } = null!;
+        public string? OriginalTitle { get; set; }
+        public string? PosterPath { get; set; }
+        public string? BackdropPath { get; set; }
+        public string? Overview { get; set; }
+        public DateOnly? ReleaseDate { get; set; }
+        public int? RuntimeMinutes { get; set; }
+        public float TmdbRating { get; set; }
+        public float TmdbPopularity { get; set; }
+        public string ContentType { get; set; } = "movie"; // movie | tv
+        public string[] Genres { get; set; } = [];
+        public string[] Keywords { get; set; } = [];
+        public string[] Directors { get; set; } = [];
+        public string[] CastTop5 { get; set; } = [];
+        public DateTime CachedAt { get; set; }
+
+        // Navigation
+        public ICollection<WatchHistory> WatchHistory { get; set; } = [];
+        public ICollection<Swipe> Swipes { get; set; } = [];
+        public ICollection<Watchlist> Watchlists { get; set; } = [];
+        public ICollection<SessionMatch> SessionMatches { get; set; } = [];
+        public ICollection<Request> Requests { get; set; } = [];
+    }
+}
+using System.ComponentModel.DataAnnotations.Schema;
+
+namespace swipefilm.Models
+{
+    // SwipeFilm.Infrastructure/Models/RefreshToken.cs
+    public class RefreshToken
+    {
+        public Guid Id { get; set; }
+        public Guid UserId { get; set; }
+        public string Token { get; set; } = null!;
+        public DateTime ExpiresAt { get; set; }
+        public DateTime CreatedAt { get; set; }
+        public bool IsRevoked { get; set; }
+
+        // Navigation
+        public User User { get; set; } = null!;
+
+        [NotMapped]
+        public bool IsExpired => DateTime.UtcNow >= ExpiresAt;
+
+        [NotMapped]
+        public bool IsValid => !IsRevoked && !IsExpired;
+    }
+}
+namespace swipefilm.Models
+{
+    public class Request
+    {
+        public Guid Id { get; set; }
+        public Guid UserId { get; set; }
+        public Guid MovieId { get; set; }
+        public string? OverseerrRequestId { get; set; }
+        public RequestStatus Status { get; set; }
+        public DateTime RequestedAt { get; set; }
+        public DateTime? AvailableAt { get; set; }
+
+        // Navigation
+        public User User { get; set; } = null!;
+        public Movie Movie { get; set; } = null!;
+    }
+
+    public enum RequestStatus
+    {
+        Pending,
+        Approved,
+        Downloading,
+        Available,
+        Rejected
+    }
+}
+using Microsoft.AspNetCore.Hosting.Server;
+
+namespace swipefilm.Models
+{
+    public class ServerMovie
+    {
+        public Guid Id { get; set; }
+        public Guid ServerId { get; set; }
+        public Guid MovieId { get; set; }
+
+        public UserServer Server { get; set; }
+        public Movie Movie { get; set; }
+    }
+}
+namespace swipefilm.Models
+{
+    public class Session
+    {
+        public Guid Id { get; set; }
+        public string Code { get; set; } = null!;  // Code court type "X7K2"
+        public SessionStatus Status { get; set; }
+        public Guid CreatedByUserId { get; set; }
+        public DateTime CreatedAt { get; set; }
+        public DateTime ExpiresAt { get; set; }
+
+        // Navigation
+        public User CreatedBy { get; set; } = null!;
+        public ICollection<SessionMember> Members { get; set; } = [];
+        public ICollection<SessionMatch> Matches { get; set; } = [];
+    }
+
+    public enum SessionStatus { Active, Completed, Expired }
+}
+namespace swipefilm.Models
+{
+    public class SessionMatch
+    {
+        public Guid Id { get; set; }
+        public Guid SessionId { get; set; }
+        public Guid MovieId { get; set; }
+        public DateTime MatchedAt { get; set; }
+
+        // Navigation
+        public Session Session { get; set; } = null!;
+        public Movie Movie { get; set; } = null!;
+    }
+}
+namespace swipefilm.Models
+{
+    public class Swipe
+    {
+        public Guid Id { get; set; }
+        public Guid UserId { get; set; }
+        public Guid MovieId { get; set; }
+        public SwipeDirection Direction { get; set; }
+        public int DurationMs { get; set; }       // Temps passé sur la carte avant de swiper
+        public SwipeContext ContextMode { get; set; }
+        public DateTime CreatedAt { get; set; }
+
+        // Navigation
+        public User User { get; set; } = null!;
+        public Movie Movie { get; set; } = null!;
+    }
+
+    public enum SwipeDirection { Left, Right }
+
+    public enum SwipeContext
+    {
+        Solo,
+        Group,
+        Discovery,
+        Evening,
+        Roulette
+    }
+}
+// SwipeFilm.Infrastructure/Models/User.cs
+using Microsoft.AspNetCore.Identity;
+using swipefilm.Models;
+
+public class User : IdentityUser<Guid>
+{
+    // IdentityUser fournit déjà :
+    // Id, Email, PasswordHash, UserName, etc.
+
+    // On ajoute seulement nos champs custom
+    public string DisplayName { get; set; } = null!;
+    public string? AvatarUrl { get; set; }
+    public DateTime CreatedAt { get; set; }
+    public DateTime? LastLoginAt { get; set; }
+
+    // Navigation
+    public ICollection<UserServer> Servers { get; set; } = [];
+    public UserSeerr? Seerr { get; set; }
+    public ICollection<WatchHistory> WatchHistory { get; set; } = [];
+    public ICollection<Swipe> Swipes { get; set; } = [];
+    public ICollection<Watchlist> Watchlist { get; set; } = [];
+    public UserProfile? Profile { get; set; }
+    public ICollection<Request> Requests { get; set; } = [];
+    public ICollection<Session> CreatedSessions { get; set; } = [];
+    public ICollection<SessionMember> SessionMemberships { get; set; } = [];
+}
+namespace swipefilm.Models
+{
+    public class UserProfile
+    {
+        public Guid Id { get; set; }
+        public Guid UserId { get; set; }
+
+        // Vecteurs de préférences — JSON en BD
+        public Dictionary<string, float> GenreWeights { get; set; } = [];
+        public Dictionary<string, float> DirectorWeights { get; set; } = [];
+        public Dictionary<string, float> ActorWeights { get; set; } = [];
+        public Dictionary<string, float> KeywordWeights { get; set; } = [];
+
+        public float PreferredMinYear { get; set; } = DateTime.Now.Year - 5;
+        public float PreferredRuntimeMax { get; set; } = 180;
+        public float IndieVsBlockbuster { get; set; } = 0.5f; // 0=indie, 1=blockbuster
+        public int TotalSignals { get; set; } = 0;
+        public DateTime UpdatedAt { get; set; }
+
+        // Navigation
+        public User User { get; set; } = null!;
+    }
+}
+namespace swipefilm.Models
+{
+    public class UserSeerr
+    {
+        public Guid Id { get; set; }
+        public Guid UserId { get; set; }
+        public string UrlEncrypted { get; set; } = null!;
+        public string ApiKeyEncrypted { get; set; } = null!;
+        public bool IsActive { get; set; } = true;
+        public DateTime CreatedAt { get; set; }
+
+        // Navigation
+        public User User { get; set; } = null!;
+    }
+}
+namespace swipefilm.Models
+{
+    public class UserServer
+    {
+        public Guid Id { get; set; }
+        public Guid UserId { get; set; }
+        public ServerType Type { get; set; }
+        public string FriendlyName { get; set; } = null!;
+        public string UrlEncrypted { get; set; } = null!;
+        public string TokenEncrypted { get; set; } = null!;
+        public bool IsActive { get; set; } = true;
+        public DateTime? LastSyncAt { get; set; }
+        public DateTime CreatedAt { get; set; }
+
+        // Navigation
+        public User User { get; set; } = null!;
+        public ICollection<WatchHistory> WatchHistory { get; set; } = [];
+    }
+
+    public enum ServerType { Plex, Jellyfin }
+}
+using System.ComponentModel.DataAnnotations.Schema;
+
+namespace swipefilm.Models
+{
+    public class WatchHistory
+    {
+        public Guid Id { get; set; }
+        public Guid UserId { get; set; }
+        public Guid ServerId { get; set; }
+        public Guid MovieId { get; set; }
+
+        // Données brutes de Plex/Jellyfin
+        public int WatchDurationSec { get; set; }  // viewOffset(ms)/1000 ou PlaybackPositionTicks/10_000_000
+        public int? AbandonedAtSec { get; set; }   // null si film complété
+        public int ViewCount { get; set; } = 1;
+        public int? UserRating { get; set; }       // Note donnée dans Plex/Jellyfin (1-10)
+        public bool IsFavorite { get; set; }       // Favori dans Plex/Jellyfin
+
+        public DateTime FirstWatchedAt { get; set; }
+        public DateTime LastWatchedAt { get; set; }
+
+        // Propriétés calculées — jamais stockées en BD
+        [NotMapped]
+        public float CompletionPct =>
+            Movie is null ? 0 :
+            Movie.RuntimeMinutes is null ? 0 :
+            (float)WatchDurationSec / (Movie.RuntimeMinutes.Value * 60) * 100;
+
+        [NotMapped]
+        public bool IsAbandoned =>
+            CompletionPct < 70f && ViewCount == 1;
+
+        // Navigation
+        public User User { get; set; } = null!;
+        public UserServer Server { get; set; } = null!;
+        public Movie Movie { get; set; } = null!;
+        public string? ContentHash { get; set; }
+    }
+}
+namespace swipefilm.Models
+{
+    public class Watchlist
+    {
+        public Guid Id { get; set; }
+        public Guid UserId { get; set; }
+        public Guid MovieId { get; set; }
+        public int Score { get; set; }            // Score calculé par l'algo, mis à jour en background
+        public DateTime AddedAt { get; set; }
+        public DateTime? RemindedAt { get; set; }
+
+        // Navigation
+        public User User { get; set; } = null!;
+        public Movie Movie { get; set; } = null!;
+    }
+}
