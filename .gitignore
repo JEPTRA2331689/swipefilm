@@ -531,3 +531,6 @@ logs/
 
 # Archives (backups, exports — not meant to be versioned)
 *.zip
+
+# Stray zip extraction that ended up tracked by mistake
+/extracted/
