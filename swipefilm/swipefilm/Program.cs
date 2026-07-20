@@ -12,6 +12,13 @@ using swipefilm.Auth;
 using swipefilm.Auth.swipefilm.Services;
 using swipefilm.Data;
 
+// ✅ Charge .env (jamais commité) dans les variables d'environnement — les
+// clés/mots de passe sortent de appsettings.json. IConfiguration lit déjà
+// les variables d'environnement par défaut (format Section__Cle), donc rien
+// d'autre à câbler : ConnectionStrings__DefaultConnection, Jwt__Secret,
+// Encryption__Secret, Tmdb__ApiKey, Webhooks__RadarrToken/SonarrToken.
+DotNetEnv.Env.Load();
+
 var builder = WebApplication.CreateBuilder(args);
 
 // ✅ Un fichier par jour, JSON (une ligne = un événement) — lu tel quel par
