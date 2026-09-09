@@ -34,3 +34,15 @@ export function releaseYear(date: string | null) {
   if (!date) return null;
   return date.slice(0, 4);
 }
+
+// ✅ Alterne deux listes (ex: films/séries) au lieu de les concaténer — évite
+// un carrousel "tous les films puis toutes les séries".
+export function interleave<T>(a: T[], b: T[]): T[] {
+  const result: T[] = [];
+  const max = Math.max(a.length, b.length);
+  for (let i = 0; i < max; i++) {
+    if (i < a.length) result.push(a[i]);
+    if (i < b.length) result.push(b[i]);
+  }
+  return result;
+}

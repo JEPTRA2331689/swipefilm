@@ -2,33 +2,24 @@
 
 import { useRouter } from "next/navigation";
 import { PosterBackdrop } from "@/components/onboarding/PosterBackdrop";
-import { AuthForm } from "@/components/auth/AuthForm";
-import { fetchMe, normalizeServer } from "@/lib/auth";
-import { useAuth } from "@/context/AuthContext";
+import { AuthForm } from "@/features/auth/components/AuthForm";
+import { fetchMe } from "@/features/auth/api";
+import { normalizeServer } from "@/features/media-server/api";
+import { useAuth } from "@/features/auth/AuthContext";
 import { useAppStore } from "@/lib/store";
-import type { UserServer } from "@/types";
 
 export default function LoginPage() {
   const router = useRouter();
   const { login } = useAuth();
   const { setUser, setServer } = useAppStore();
-  const auth = useAuth();
 
   async function handleLogin(values: Record<string, string>) {
-    console.log("Login form submitted with values:", values);
     await login(values.username, values.password);
 
-    console.log(auth);
     const me = await fetchMe();
+    setUser(me);
 
-    setUser({
-      id: me.id,
-      username: me.username,
-      name: (me as { displayName?: string }).displayName ?? me.username,
-    });
-
-    const raw = (me as { server?: UserServer | null }).server ?? null;
-    const server = raw ? normalizeServer(raw) : null;
+    const server = me.server ? normalizeServer(me.server) : null;
     setServer(server);
 
     router.replace(server ? "/home" : "/onboarding");
@@ -56,9 +47,6 @@ export default function LoginPage() {
           },
         ]}
         submitLabel="Se connecter"
-        footerText="Pas encore de compte ?"
-        footerLinkLabel="Créer un compte"
-        footerLinkHref="/signup"
         onSubmit={handleLogin}
       />
     </div>

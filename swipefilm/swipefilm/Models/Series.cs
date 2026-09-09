@@ -28,5 +28,6 @@ namespace swipefilm.Models
         public ICollection<Swipe> Swipes { get; set; } = [];
         public ICollection<Watchlist> Watchlists { get; set; } = [];
         public ICollection<MediaRequest> Requests { get; set; } = [];
+        public ICollection<SessionMatch> SessionMatches { get; set; } = [];
     }
 }

@@ -1,15 +1,24 @@
 "use client";
 
 import { MovieCard } from "@/components/movie/MovieCard";
-import type { HomeSection } from "@/types";
+import { ScrollArrows } from "@/components/ui/ScrollArrows";
+import { SeeMoreCard } from "@/components/ui/SeeMoreCard";
+import { useHorizontalScroll } from "@/hooks/useHorizontalScroll";
+import type { AvailabilityFilter, HomeSection } from "@/types";
 import { MoviePoster } from "./MoviePoster";
 
 interface SectionRowProps {
   section: HomeSection;
+  availability?: AvailabilityFilter;
 }
 
-export function SectionRow({ section }: SectionRowProps) {
+export function SectionRow({ section, availability = 0 }: SectionRowProps) {
+  const { containerRef, canScrollLeft, canScrollRight, scrollByPage } =
+    useHorizontalScroll<HTMLDivElement>();
+
   if (!section.movies.length) return null;
+
+  const seeMoreHref = `/browse?section=${encodeURIComponent(section.id)}&title=${encodeURIComponent(section.title)}&availability=${availability}`;
 
   return (
     <section className="border-border border-t pt-5 pb-2 sm:pt-7">
@@ -17,13 +26,16 @@ export function SectionRow({ section }: SectionRowProps) {
         <div className="flex items-center gap-3">
           {/* Accent bar */}
           <div className="bg-accent h-5 w-0.5 rounded-full opacity-70" />
-          <h2 className="font-display text-text-primary text-base font-semibold sm:text-[17px] lg:text-[19px]">
+          <h2 className="font-display text-text-primary text-base sm:text-[17px] lg:text-[19px]">
             {section.title}
           </h2>
         </div>
-        <span className="text-text-secondary text-[11px] whitespace-nowrap sm:text-xs">
-          {section.movies.length} film{section.movies.length !== 1 ? "s" : ""}
-        </span>
+        <ScrollArrows
+          canScrollLeft={canScrollLeft}
+          canScrollRight={canScrollRight}
+          onScrollLeft={() => scrollByPage("left")}
+          onScrollRight={() => scrollByPage("right")}
+        />
       </div>
 
       {/* Scroll row with edge fades */}
@@ -33,7 +45,10 @@ export function SectionRow({ section }: SectionRowProps) {
         {/* Fade droite */}
         <div className="from-bg-primary pointer-events-none absolute top-0 right-0 bottom-0 z-10 w-8 bg-gradient-to-l to-transparent sm:w-12 md:w-16" />
 
-        <div className="scrollbar-hide flex snap-x snap-proximity gap-2.5 overflow-x-auto scroll-smooth px-3 pb-3 sm:gap-3 sm:px-6 md:gap-3.5 md:px-12">
+        <div
+          ref={containerRef}
+          className="scrollbar-hide flex snap-x snap-proximity gap-2.5 overflow-x-auto scroll-smooth px-3 pb-3 sm:gap-3 sm:px-6 md:gap-3.5 md:px-12"
+        >
           {section.movies.map((movie) => (
             <div key={movie.id} className="snap-start">
               <div className="aspect-[2/3] h-100 flex-shrink-0">
@@ -41,6 +56,10 @@ export function SectionRow({ section }: SectionRowProps) {
               </div>
             </div>
           ))}
+          <SeeMoreCard
+            href={seeMoreHref}
+            className="aspect-[2/3] h-100 w-[110px] snap-start"
+          />
         </div>
       </div>
     </section>
@@ -49,12 +68,12 @@ export function SectionRow({ section }: SectionRowProps) {
 
 export function SectionRowSkeleton() {
   return (
-    <section className="border-border border-t bg-amber-900 pt-5 pb-2 sm:pt-7">
+    <section className="border-border border-t pt-5 pb-2 sm:pt-7">
       <div className="mb-3 flex items-center gap-3 px-3 sm:px-6 md:px-12">
         <div className="bg-surface-alt h-5 w-0.5 animate-pulse rounded-full" />
         <div className="bg-surface-alt h-4 w-36 animate-pulse rounded sm:h-5 sm:w-44" />
       </div>
-      <div className="flex gap-2.5 bg-amber-600 px-3 pb-3 sm:gap-3 sm:px-6 md:gap-3.5 md:px-12">
+      <div className="flex gap-2.5 px-3 pb-3 sm:gap-3 sm:px-6 md:gap-3.5 md:px-12">
         {Array.from({ length: 7 }).map((_, i) => (
           <div
             key={i}

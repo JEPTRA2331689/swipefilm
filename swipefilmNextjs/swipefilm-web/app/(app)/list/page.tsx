@@ -2,9 +2,10 @@
 
 import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
+import { Film, Filter, X, ChevronLeft, ChevronRight } from "lucide-react";
 import { TopNav } from "@/components/layout/TopNav";
 import { useWatchlist, type WatchlistMovie } from "@/hooks/useWatchlist";
-import { MovieRequestCard } from "@/components/movie/MovieRequestCard";
+import { MovieRequestCard } from "@/features/catalog/components/MovieRequestCard";
 import {
   createRequest,
   cancelRequest,
@@ -12,8 +13,8 @@ import {
   requestMedia,
   type MovieRequest,
   type RequestStatusCode,
-} from "@/lib/auth";
-import { useAuth } from "@/context/AuthContext";
+} from "@/features/catalog/api";
+import { useAuth } from "@/features/auth/AuthContext";
 import { Permission } from "@/lib/permissions";
 import { cn } from "@/lib/utils";
 import { Button, IconButton } from "@/components/ui/Button";
@@ -269,7 +270,7 @@ export default function ListPage() {
 
         {!loading && !error && movies.length === 0 && (
           <div className="text-text-secondary flex flex-col items-center justify-center gap-3 py-20">
-            <i className="ph-thin ph-film-strip text-5xl" />
+            <Film className="size-12" />
             <p className="text-sm">Aucun film liké pour l&apos;instant.</p>
             <Link href="/swipe" className="text-accent text-sm hover:underline">
               Commencer à swiper →
@@ -279,7 +280,7 @@ export default function ListPage() {
 
         {!loading && !error && filtered.length === 0 && movies.length > 0 && (
           <div className="text-text-secondary flex flex-col items-center justify-center gap-2 py-16">
-            <i className="ph-thin ph-funnel text-4xl" />
+            <Filter className="size-8" />
             <p className="text-sm">Aucun film pour ce filtre.</p>
           </div>
         )}
@@ -328,7 +329,7 @@ export default function ListPage() {
                     className="bg-surface-alt border-border text-text-secondary/50 absolute top-2 right-2 flex h-6 w-6 cursor-pointer items-center justify-center rounded-full border opacity-0 transition-all group-hover:opacity-100 hover:border-red-500/30 hover:text-red-400"
                     title="Retirer de la liste"
                   >
-                    <i className="ph-thin ph-x text-xs" />
+                    <X className="size-3.5" />
                   </button>
                 </div>
               );
@@ -345,7 +346,7 @@ export default function ListPage() {
               onClick={() => goTo(safePage - 1)}
               disabled={safePage === 1}
             >
-              <i className="ph-thin ph-caret-left text-base" />
+              <ChevronLeft className="size-4" />
             </IconButton>
 
             {/* Numéros de page */}
@@ -384,7 +385,7 @@ export default function ListPage() {
               onClick={() => goTo(safePage + 1)}
               disabled={safePage === totalPages}
             >
-              <i className="ph-thin ph-caret-right text-base" />
+              <ChevronRight className="size-4" />
             </IconButton>
           </div>
         )}

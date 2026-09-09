@@ -188,6 +188,9 @@ namespace swipefilm.Migrations
                     b.Property<bool>("EmailConfirmed")
                         .HasColumnType("boolean");
 
+                    b.Property<bool>("IsGuest")
+                        .HasColumnType("boolean");
+
                     b.Property<string>("JellyfinUserId")
                         .HasColumnType("text");
 
@@ -290,6 +293,28 @@ namespace swipefilm.Migrations
                             Key = "IsSetupComplete",
                             Value = "false"
                         });
+                });
+
+            modelBuilder.Entity("swipefilm.Models.AuthSession", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime>("ExpiresAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("UserId");
+
+                    b.ToTable("AuthSessions");
                 });
 
             modelBuilder.Entity("swipefilm.Models.DiscoveryCache", b =>
@@ -661,41 +686,6 @@ namespace swipefilm.Migrations
                     b.ToTable("SeriesWatchHistory");
                 });
 
-            modelBuilder.Entity("swipefilm.Models.ServerConfig", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<string>("FriendlyName")
-                        .IsRequired()
-                        .HasColumnType("text");
-
-                    b.Property<DateTime?>("LastSyncAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<string>("MachineIdentifier")
-                        .HasColumnType("text");
-
-                    b.Property<string>("TokenEncrypted")
-                        .IsRequired()
-                        .HasColumnType("text");
-
-                    b.Property<int>("Type")
-                        .HasColumnType("integer");
-
-                    b.Property<string>("UrlEncrypted")
-                        .IsRequired()
-                        .HasColumnType("text");
-
-                    b.HasKey("Id");
-
-                    b.ToTable("ServerConfig");
-                });
-
             modelBuilder.Entity("swipefilm.Models.ServerMovie", b =>
                 {
                     b.Property<Guid>("Id")
@@ -766,11 +756,11 @@ namespace swipefilm.Migrations
                         .IsRequired()
                         .HasColumnType("text");
 
+                    b.Property<int>("ContentTypeFilter")
+                        .HasColumnType("integer");
+
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("timestamp with time zone");
-
-                    b.Property<Guid>("CreatedById")
-                        .HasColumnType("uuid");
 
                     b.Property<Guid>("CreatedByUserId")
                         .HasColumnType("uuid");
@@ -778,12 +768,25 @@ namespace swipefilm.Migrations
                     b.Property<DateTime>("ExpiresAt")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<string[]>("GenreFilter")
+                        .HasColumnType("text[]");
+
+                    b.Property<bool>("HasLaunched")
+                        .HasColumnType("boolean");
+
+                    b.Property<bool>("HasStarted")
+                        .HasColumnType("boolean");
+
                     b.Property<int>("Status")
                         .HasColumnType("integer");
 
                     b.HasKey("Id");
 
-                    b.HasIndex("CreatedById");
+                    b.HasIndex("Code")
+                        .IsUnique()
+                        .HasDatabaseName("idx_sessions_code");
+
+                    b.HasIndex("CreatedByUserId");
 
                     b.ToTable("Sessions");
                 });
@@ -797,7 +800,10 @@ namespace swipefilm.Migrations
                     b.Property<DateTime>("MatchedAt")
                         .HasColumnType("timestamp with time zone");
 
-                    b.Property<Guid>("MovieId")
+                    b.Property<Guid?>("MovieId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("SeriesId")
                         .HasColumnType("uuid");
 
                     b.Property<Guid>("SessionId")
@@ -807,9 +813,15 @@ namespace swipefilm.Migrations
 
                     b.HasIndex("MovieId");
 
-                    b.HasIndex("SessionId");
+                    b.HasIndex("SeriesId");
 
-                    b.ToTable("SessionMatches");
+                    b.HasIndex("SessionId")
+                        .HasDatabaseName("idx_sessionmatches_sessionid");
+
+                    b.ToTable("SessionMatches", t =>
+                        {
+                            t.HasCheckConstraint("ck_sessionmatches_movie_xor_series", "(\"MovieId\" IS NOT NULL) <> (\"SeriesId\" IS NOT NULL)");
+                        });
                 });
 
             modelBuilder.Entity("swipefilm.Models.SessionMember", b =>
@@ -860,6 +872,9 @@ namespace swipefilm.Migrations
                     b.Property<Guid?>("SeriesId")
                         .HasColumnType("uuid");
 
+                    b.Property<Guid?>("SessionId")
+                        .HasColumnType("uuid");
+
                     b.Property<Guid>("UserId")
                         .HasColumnType("uuid");
 
@@ -868,6 +883,8 @@ namespace swipefilm.Migrations
                     b.HasIndex("MovieId");
 
                     b.HasIndex("SeriesId");
+
+                    b.HasIndex("SessionId");
 
                     b.HasIndex("UserId")
                         .HasDatabaseName("idx_swipes_userid");
@@ -973,45 +990,6 @@ namespace swipefilm.Migrations
                     b.ToTable("UserProfiles");
                 });
 
-            modelBuilder.Entity("swipefilm.Models.UserRadarr", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
-
-                    b.Property<string>("ApiKeyEncrypted")
-                        .IsRequired()
-                        .HasColumnType("text");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<int?>("DefaultQualityProfileId")
-                        .HasColumnType("integer");
-
-                    b.Property<string>("DefaultQualityProfileName")
-                        .HasColumnType("text");
-
-                    b.Property<string>("DefaultRootFolderPath")
-                        .HasColumnType("text");
-
-                    b.Property<bool>("IsActive")
-                        .HasColumnType("boolean");
-
-                    b.Property<string>("UrlEncrypted")
-                        .IsRequired()
-                        .HasColumnType("text");
-
-                    b.Property<Guid>("UserId")
-                        .HasColumnType("uuid");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("UserId");
-
-                    b.ToTable("UserRadarr");
-                });
-
             modelBuilder.Entity("swipefilm.Models.UserSeerr", b =>
                 {
                     b.Property<Guid>("Id")
@@ -1115,45 +1093,6 @@ namespace swipefilm.Migrations
                         .HasDatabaseName("idx_userseriesprofiles_userid");
 
                     b.ToTable("UserSeriesProfiles");
-                });
-
-            modelBuilder.Entity("swipefilm.Models.UserSonarr", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
-
-                    b.Property<string>("ApiKeyEncrypted")
-                        .IsRequired()
-                        .HasColumnType("text");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<int?>("DefaultQualityProfileId")
-                        .HasColumnType("integer");
-
-                    b.Property<string>("DefaultQualityProfileName")
-                        .HasColumnType("text");
-
-                    b.Property<string>("DefaultRootFolderPath")
-                        .HasColumnType("text");
-
-                    b.Property<bool>("IsActive")
-                        .HasColumnType("boolean");
-
-                    b.Property<string>("UrlEncrypted")
-                        .IsRequired()
-                        .HasColumnType("text");
-
-                    b.Property<Guid>("UserId")
-                        .HasColumnType("uuid");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("UserId");
-
-                    b.ToTable("UserSonarr");
                 });
 
             modelBuilder.Entity("swipefilm.Models.WatchHistory", b =>
@@ -1296,6 +1235,17 @@ namespace swipefilm.Migrations
                         .IsRequired();
                 });
 
+            modelBuilder.Entity("swipefilm.Models.AuthSession", b =>
+                {
+                    b.HasOne("User", "User")
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("User");
+                });
+
             modelBuilder.Entity("swipefilm.Models.MediaRequest", b =>
                 {
                     b.HasOne("swipefilm.Models.Movie", "Movie")
@@ -1406,7 +1356,7 @@ namespace swipefilm.Migrations
                 {
                     b.HasOne("User", "CreatedBy")
                         .WithMany("CreatedSessions")
-                        .HasForeignKey("CreatedById")
+                        .HasForeignKey("CreatedByUserId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
@@ -1418,8 +1368,12 @@ namespace swipefilm.Migrations
                     b.HasOne("swipefilm.Models.Movie", "Movie")
                         .WithMany("SessionMatches")
                         .HasForeignKey("MovieId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
+                        .OnDelete(DeleteBehavior.Cascade);
+
+                    b.HasOne("swipefilm.Models.Series", "Series")
+                        .WithMany("SessionMatches")
+                        .HasForeignKey("SeriesId")
+                        .OnDelete(DeleteBehavior.Cascade);
 
                     b.HasOne("swipefilm.Models.Session", "Session")
                         .WithMany("Matches")
@@ -1428,6 +1382,8 @@ namespace swipefilm.Migrations
                         .IsRequired();
 
                     b.Navigation("Movie");
+
+                    b.Navigation("Series");
 
                     b.Navigation("Session");
                 });
@@ -1463,6 +1419,11 @@ namespace swipefilm.Migrations
                         .HasForeignKey("SeriesId")
                         .OnDelete(DeleteBehavior.Cascade);
 
+                    b.HasOne("swipefilm.Models.Session", "Session")
+                        .WithMany("Swipes")
+                        .HasForeignKey("SessionId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
                     b.HasOne("User", "User")
                         .WithMany("Swipes")
                         .HasForeignKey("UserId")
@@ -1473,6 +1434,8 @@ namespace swipefilm.Migrations
 
                     b.Navigation("Series");
 
+                    b.Navigation("Session");
+
                     b.Navigation("User");
                 });
 
@@ -1481,17 +1444,6 @@ namespace swipefilm.Migrations
                     b.HasOne("User", "User")
                         .WithOne("Profile")
                         .HasForeignKey("swipefilm.Models.UserProfile", "UserId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("User");
-                });
-
-            modelBuilder.Entity("swipefilm.Models.UserRadarr", b =>
-                {
-                    b.HasOne("User", "User")
-                        .WithMany()
-                        .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
@@ -1514,17 +1466,6 @@ namespace swipefilm.Migrations
                     b.HasOne("User", "User")
                         .WithOne("SeriesProfile")
                         .HasForeignKey("swipefilm.Models.UserSeriesProfile", "UserId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("User");
-                });
-
-            modelBuilder.Entity("swipefilm.Models.UserSonarr", b =>
-                {
-                    b.HasOne("User", "User")
-                        .WithMany()
-                        .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
@@ -1620,6 +1561,8 @@ namespace swipefilm.Migrations
 
                     b.Navigation("Seasons");
 
+                    b.Navigation("SessionMatches");
+
                     b.Navigation("Swipes");
 
                     b.Navigation("Watchlists");
@@ -1630,6 +1573,8 @@ namespace swipefilm.Migrations
                     b.Navigation("Matches");
 
                     b.Navigation("Members");
+
+                    b.Navigation("Swipes");
                 });
 #pragma warning restore 612, 618
         }

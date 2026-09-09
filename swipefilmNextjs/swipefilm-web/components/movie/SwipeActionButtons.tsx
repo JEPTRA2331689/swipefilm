@@ -1,3 +1,4 @@
+import { Heart, ThumbsUp, X, ThumbsDown } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/Button";
 
@@ -16,36 +17,36 @@ export function SwipeActionButtons({
   disabled,
   className,
 }: SwipeActionButtonsProps) {
+  // ✅ Ordre = sens du swipe : dislike (swipe gauche) à gauche, like (swipe
+  // droite) à droite — inversé avant (like rendu en premier = à gauche).
   return (
     <>
-      <Button
-        variant="like"
-        onClick={() => onSwipe("Right")}
-        disabled={disabled}
-        className={cn("gap-2 px-4 py-2 font-bold", className)}
-      >
-        <i
-          className={cn(
-            "ph-fill text-base text-black",
-            swipeState === "liked" ? "ph-heart" : "ph-thumbs-up",
-          )}
-        />
-        {swipeState === "liked" ? "Aimé !" : "like"}
-      </Button>
-
       <Button
         variant="skip"
         onClick={() => onSwipe("Left")}
         disabled={disabled}
         className={cn("gap-2 px-4 py-2 font-bold", className)}
       >
-        <i
-          className={cn(
-            "ph-fill text-base text-black",
-            swipeState === "disliked" ? "ph-x" : "ph-thumbs-down",
-          )}
-        />
+        {swipeState === "disliked" ? (
+          <X className="size-4 text-black" fill="currentColor" />
+        ) : (
+          <ThumbsDown className="size-4 text-black" fill="currentColor" />
+        )}
         {swipeState === "disliked" ? "Noté" : "dislike"}
+      </Button>
+
+      <Button
+        variant="like"
+        onClick={() => onSwipe("Right")}
+        disabled={disabled}
+        className={cn("gap-2 px-4 py-2 font-bold", className)}
+      >
+        {swipeState === "liked" ? (
+          <Heart className="size-4 text-black" fill="currentColor" />
+        ) : (
+          <ThumbsUp className="size-4 text-black" fill="currentColor" />
+        )}
+        {swipeState === "liked" ? "Aimé !" : "like"}
       </Button>
     </>
   );

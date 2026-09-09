@@ -1,6 +1,16 @@
 import { cva, type VariantProps } from "class-variance-authority";
+import {
+  Clock,
+  Check,
+  CircleArrowDown,
+  CircleDashed,
+  CircleCheck,
+  XCircle,
+  MinusCircle,
+  type LucideIcon,
+} from "lucide-react";
 import { cn } from "@/lib/utils";
-import { statusFromCode, type MovieRequest } from "@/lib/auth";
+import { statusFromCode, type MovieRequest } from "@/features/catalog/api";
 
 // ✅ Dot de disponibilité — un seul composant, une seule convention de
 // couleur (vert=dispo, jaune=non dispo) réutilisée partout (posters,
@@ -15,7 +25,7 @@ export function AvailabilityDot({
   return (
     <div
       className={cn(
-        "ring-bg-primary/60 h-2.5 w-2.5 rounded-full ring-2",
+        "ring-bg-primary/60 h-4 aspect-square ring-2",
         isAvailable ? "bg-success" : "bg-swipe-star",
         className,
       )}
@@ -89,7 +99,7 @@ type StatusConfig = {
   label: string;
   stripe: string; // couleur de bande latérale (MovieRequestCard)
   badge: string; // fond + texte du badge
-  icon: string;
+  icon: LucideIcon;
 };
 
 export function getStatusConfig(
@@ -104,42 +114,42 @@ export function getStatusConfig(
         label: "En attente",
         stripe: "bg-yellow-500",
         badge: "bg-yellow-500/20 text-yellow-400 border-yellow-500/30",
-        icon: "ph-clock",
+        icon: Clock,
       };
     case "approved":
       return {
         label: "Approuvée",
         stripe: "bg-blue-400",
         badge: "bg-blue-400/20 text-blue-300 border-blue-400/30",
-        icon: "ph-check",
+        icon: Check,
       };
     case "downloading":
       return {
         label: "En téléchargement",
         stripe: "bg-blue-500",
         badge: "bg-blue-500/20 text-blue-400 border-blue-500/30",
-        icon: "ph-arrow-circle-down",
+        icon: CircleArrowDown,
       };
     case "partially-available":
       return {
         label: "Partiellement disponible",
         stripe: "bg-orange-500",
         badge: "bg-orange-500/20 text-orange-400 border-orange-500/30",
-        icon: "ph-circle-half",
+        icon: CircleDashed,
       };
     case "available":
       return {
         label: "Disponible",
         stripe: "bg-green-500",
         badge: "bg-green-500/20 text-green-400 border-green-500/30",
-        icon: "ph-check-circle",
+        icon: CircleCheck,
       };
     case "declined":
       return {
         label: "Refusée",
         stripe: "bg-red-500",
         badge: "bg-red-500/20 text-red-400 border-red-500/30",
-        icon: "ph-x-circle",
+        icon: XCircle,
       };
     case "none":
     default:
@@ -147,7 +157,7 @@ export function getStatusConfig(
         label: "Non demandé",
         stripe: "bg-surface-alt",
         badge: "bg-surface-alt text-text-secondary border-border",
-        icon: "ph-minus-circle",
+        icon: MinusCircle,
       };
   }
 }
@@ -170,7 +180,7 @@ export function RequestStatusBadge({
         className,
       )}
     >
-      <i className={cn("ph-thin text-sm", status.icon)} />
+      <status.icon className="size-4" />
       {status.label}
     </span>
   );

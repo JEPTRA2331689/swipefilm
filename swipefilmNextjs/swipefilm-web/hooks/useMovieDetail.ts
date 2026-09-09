@@ -14,16 +14,16 @@ interface TmdbExtra {
 
 interface MovieDetailData {
   movie: Movie | null;
-  similar: Movie[];
   extra: TmdbExtra | null;
   loading: boolean;
   error: string | null;
 }
 
-export function useMovieDetail(movieId: string): MovieDetailData {
+// ✅ "Films similaires" est géré par SimilarMedia (self-contained, features/
+// catalog) — plus de fetch dupliqué ici.
+export function useMovieDetail(movieId: string | null): MovieDetailData {
   const user = useAppStore((s) => s.user);
   const [movie, setMovie] = useState<Movie | null>(null);
-  const [similar, setSimilar] = useState<Movie[]>([]);
   const [extra, setExtra] = useState<TmdbExtra | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -37,44 +37,16 @@ export function useMovieDetail(movieId: string): MovieDetailData {
       setError(null);
 
       try {
-        // Dans useMovieDetail.ts — remplace les deux appels actuels par :
-
-        const [movieRes, simRes] = await Promise.all([
-          // ✅ Vrai endpoint film par ID
-          api.get<Movie>(`/api/movies/${movieId}`),
-
-          // Films similaires — garde celui-là
-          api.get<Movie[]>(
-            `/api/recommendations` +
-              `?section=because_you_liked&basedOnMovieId=${movieId}&count=12`,
-          ),
-        ]);
-
-        setMovie(movieRes);
-        setSimilar(simRes ?? []);
-
-        // Détails TMDB complémentaires (backdrop, cast avec photos)
-        if (movieRes?.tmdbId) {
-          const tmdbExtra = await fetch(`/api/tmdb/movie/${movieRes.tmdbId}`)
-            .then((r) => r.json())
-            .catch(() => null);
-          if (!cancelled) setExtra(tmdbExtra);
-        }
+        const movieRes = await api.get<Movie>(`/api/movies/${movieId}`);
 
         if (cancelled) return;
+        setMovie(movieRes);
 
-        // Le film de référence est dans refRes[0] ou le premier de simRes
-        const foundMovie = movieRes ?? simRes?.[0] ?? null;
-        setMovie(foundMovie);
-        setSimilar(simRes?.slice(0, 12) ?? []);
-
-        // 2. Détails TMDB (cast, directors, backdrop) si on a le tmdbId
-        const tmdbId = foundMovie?.tmdbId;
-        if (tmdbId) {
-          const tmdbExtra = await fetch(`/api/tmdb/movie/${tmdbId}`)
-            .then((r) => r.json())
+        // Détails TMDB complémentaires (backdrop, cast avec photos, tagline)
+        if (movieRes?.tmdbId) {
+          const tmdbExtra = await api
+            .get<TmdbExtra>(`/api/tmdb/movie/${movieRes.tmdbId}`)
             .catch(() => null);
-
           if (!cancelled) setExtra(tmdbExtra);
         }
       } catch (err: unknown) {
@@ -92,5 +64,5 @@ export function useMovieDetail(movieId: string): MovieDetailData {
     };
   }, [movieId, user]);
 
-  return { movie, similar, extra, loading, error };
+  return { movie, extra, loading, error };
 }

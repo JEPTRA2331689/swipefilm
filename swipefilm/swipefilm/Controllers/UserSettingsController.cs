@@ -16,16 +16,13 @@ namespace swipefilm.Controllers
     {
         private readonly AppDbContext _db;
         private readonly UserManager<User> _userManager;
-        private readonly AuthManager _authManager;
 
         public UserSettingsController(
             AppDbContext db,
-            UserManager<User> userManager,
-            AuthManager authManager)
+            UserManager<User> userManager)
         {
             _db = db;
             _userManager = userManager;
-            _authManager = authManager;
         }
 
         private Guid CurrentUserId =>
@@ -65,11 +62,12 @@ namespace swipefilm.Controllers
 
             await _db.SaveChangesAsync();
 
-            // ✅ Régénère le token avec le nouveau displayName
+            // ✅ Plus besoin de "régénérer un token" comme avec le JWT — les
+            // claims de session se rafraîchissent depuis la base à chaque
+            // requête (voir Program.cs, OnValidatePrincipal).
             return Ok(new
             {
                 Message = "Profil mis à jour",
-                Token = _authManager.GenerateToken(user),
                 User = MapToDto(user)
             });
         }
@@ -151,15 +149,30 @@ namespace swipefilm.Controllers
             var effectiveTvLimit = user.TvQuotaLimit ?? globalTvLimit;
             int? effectiveTvDays = user.TvQuotaDays ?? globalTvDays ?? 7;
 
-            // ✅ Compte les requêtes dans la période effective
+            // ✅ Compte les requêtes dans la période effective — même logique
+            // que MediaRequestService.CheckQuotaAsync (source de vérité : la
+            // table MediaRequest, pas la config Radarr/Sonarr).
             int? moviesUsed = null;
             int? tvUsed = null;
 
             if (effectiveMovieLimit is not null)
             {
-                moviesUsed = await _db.UserRadarr
-                    .Where(r => r.UserId == CurrentUserId)
-                    .CountAsync(); // ← à affiner quand tu auras une table de log des ajouts
+                var since = DateTime.UtcNow.AddDays(-(effectiveMovieDays ?? 7));
+                moviesUsed = await _db.MediaRequests.CountAsync(r =>
+                    r.UserId == CurrentUserId
+                    && r.Type == MediaRequestType.Movie
+                    && r.Status != RequestStatus.Declined
+                    && r.RequestedAt > since);
+            }
+
+            if (effectiveTvLimit is not null)
+            {
+                var since = DateTime.UtcNow.AddDays(-(effectiveTvDays ?? 7));
+                tvUsed = await _db.MediaRequests.CountAsync(r =>
+                    r.UserId == CurrentUserId
+                    && r.Type == MediaRequestType.Tv
+                    && r.Status != RequestStatus.Declined
+                    && r.RequestedAt > since);
             }
 
             return Ok(new

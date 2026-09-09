@@ -16,6 +16,15 @@
         /// elles sont regardées).
         /// </summary>
         Task<List<SeasonItem>> GetSeasonsAsync(string seriesServerId, string? userId);
+
+        /// <summary>
+        /// ServerId (Jellyfin) / ratingKey de la série (Plex) des séries ayant eu
+        /// une activité de visionnage depuis `since` — permet à
+        /// SyncSeriesWatchHistoryForUserAsync de ne rappeler GetSeasonsAsync que
+        /// pour les séries concernées au lieu de toute la bibliothèque à chaque
+        /// passage. `since` null → tout est concerné (première sync).
+        /// </summary>
+        Task<HashSet<string>> GetRecentlyWatchedSeriesServerIdsAsync(DateTime? since, string? userId);
     }
 
     // DTO commun Plex + Jellyfin

@@ -23,11 +23,15 @@ namespace swipefilm.Controllers
         public async Task<IActionResult> GetWatchlist()
         {
             // ✅ Films swipés à droite
+            // ✅ SessionId == null — les swipes faits pendant une session de
+            // groupe sont éphémères/partagés, pas une action personnelle de
+            // l'utilisateur ; ils ne doivent pas polluer sa liste perso.
             var swipedMovies = await _db.Swipes
                 .Include(s => s.Movie)
                 .Where(s => s.UserId == CurrentUserId
                          && s.Direction == SwipeDirection.Right
-                         && s.Movie != null)
+                         && s.Movie != null
+                         && s.SessionId == null)
                 .Select(s => new
                 {
                     s.Movie!.Id,
@@ -51,7 +55,8 @@ namespace swipefilm.Controllers
                 .Include(s => s.Series)
                 .Where(s => s.UserId == CurrentUserId
                          && s.Direction == SwipeDirection.Right
-                         && s.Series != null)
+                         && s.Series != null
+                         && s.SessionId == null)
                 .Select(s => new
                 {
                     s.Series!.Id,
@@ -87,6 +92,7 @@ namespace swipefilm.Controllers
             var swipe = await _db.Swipes
                 .FirstOrDefaultAsync(s => s.UserId == CurrentUserId
                                        && s.Direction == SwipeDirection.Right
+                                       && s.SessionId == null
                                        && (s.MovieId == id || s.SeriesId == id));
 
             if (swipe is null) return NotFound();

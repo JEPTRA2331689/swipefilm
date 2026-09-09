@@ -1,0 +1,24 @@
+# .NET build artifacts
+**/bin/
+**/obj/
+**/.vs/
+
+# Secrets — never bake into an image, passed via env at runtime
+**/.env
+**/.env.*
+!**/.env.example
+
+# Instance config — admin-configurable at runtime via a mounted volume
+swipefilm/swipefilm/config/
+swipefilm/swipefilm/logs/
+
+# Frontend — réinstallé/rebuild à l'intérieur du conteneur, jamais depuis
+# l'hôte (node_modules natif serait pour la mauvaise plateforme)
+swipefilmNextjs/swipefilm-web/node_modules/
+swipefilmNextjs/swipefilm-web/.next/
+swipefilmNextjs/swipefilm-web/out/
+
+# Misc
+.git/
+extracted/
+*.zip

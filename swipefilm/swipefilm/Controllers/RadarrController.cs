@@ -1,9 +1,6 @@
-﻿// swipefilm/Controllers/RadarrController.cs
-using System.Security.Claims;
-using System.Text.Json;
+// swipefilm/Controllers/RadarrController.cs
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
 using swipefilm.Auth;
 using swipefilm.Models;
 
@@ -14,26 +11,14 @@ namespace swipefilm.Controllers
     [Authorize]
     public class RadarrController : ControllerBase
     {
-        private readonly AppDbContext _db;
         private readonly RadarrService _radarr;
-        private readonly IEncryptionService _encryption;
-        private readonly IHttpClientFactory _httpFactory; // ✅ ajout
+        private readonly IAppConfigService _config;
 
-
-        public RadarrController(
-            AppDbContext db,
-            RadarrService radarr,
-            IEncryptionService encryption,
-            IHttpClientFactory httpFactory)
+        public RadarrController(RadarrService radarr, IAppConfigService config)
         {
-            _db = db;
             _radarr = radarr;
-            _encryption = encryption;
-            _httpFactory = httpFactory;
+            _config = config;
         }
-
-        private Guid CurrentUserId =>
-            Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
 
         // ─── Configuration (réservée admin — config globale d'instance) ─
 
@@ -53,35 +38,28 @@ namespace swipefilm.Controllers
         [RequirePermission(Permission.Admin)]
         public async Task<IActionResult> Configure([FromBody] ArrConfigDto dto)
         {
-            // Valide d'abord
             var ok = await _radarr.TestConnectionAsync(dto.Url, dto.ApiKey);
             if (!ok)
                 return BadRequest(new { error = "Connexion Radarr impossible" });
 
-            var existing = await _db.UserRadarr
-                .FirstOrDefaultAsync(r => r.UserId == CurrentUserId);
+            await _config.SetRadarrAsync(dto.Url.TrimEnd('/'), dto.ApiKey);
 
-            if (existing is null)
-            {
-                _db.UserRadarr.Add(new UserRadarr
-                {
-                    Id = Guid.NewGuid(),
-                    UserId = CurrentUserId,
-                    UrlEncrypted = _encryption.Encrypt(dto.Url.TrimEnd('/')),
-                    ApiKeyEncrypted = _encryption.Encrypt(dto.ApiKey),
-                    IsActive = true,
-                    CreatedAt = DateTime.UtcNow
-                });
-            }
-            else
-            {
-                existing.UrlEncrypted = _encryption.Encrypt(dto.Url.TrimEnd('/'));
-                existing.ApiKeyEncrypted = _encryption.Encrypt(dto.ApiKey);
-                existing.IsActive = true;
-            }
+            var publicUrl = _config.GetPublicUrl();
+            bool webhookRegistered = false;
+            string? callbackUrl = null;
+            string? webhookError = "Adresse publique non configurée — le webhook n'a pas été enregistré automatiquement";
 
-            await _db.SaveChangesAsync();
-            return Ok(new { message = "Radarr configuré" });
+            if (publicUrl is not null)
+                (webhookRegistered, callbackUrl, webhookError) = await _radarr.RegisterWebhookAsync(publicUrl);
+
+            return Ok(new
+            {
+                message = "Radarr configuré",
+                testConnectionOk = true,
+                webhookRegistered,
+                callbackUrl,
+                webhookError,
+            });
         }
 
         /// <summary>Déconnecter Radarr</summary>
@@ -89,25 +67,39 @@ namespace swipefilm.Controllers
         [RequirePermission(Permission.Admin)]
         public async Task<IActionResult> Remove()
         {
-            var existing = await _db.UserRadarr
-                .FirstOrDefaultAsync(r => r.UserId == CurrentUserId);
-
-            if (existing is null) return NotFound();
-
-            existing.IsActive = false;
-            await _db.SaveChangesAsync();
+            if (_config.GetRadarr() is null) return NotFound();
+            await _config.RemoveRadarrAsync();
             return Ok(new { message = "Radarr déconnecté" });
+        }
+
+        /// <summary>Vérifie et (ré)enregistre le webhook Radarr → SwipeFilm à la demande.</summary>
+        [HttpPost("webhook/verify")]
+        [RequirePermission(Permission.Admin)]
+        public async Task<IActionResult> VerifyWebhook()
+        {
+            if (_config.GetRadarr() is null)
+                return NotFound(new { error = "Radarr non configuré" });
+
+            var publicUrl = _config.GetPublicUrl();
+            if (publicUrl is null)
+                return BadRequest(new
+                {
+                    success = false,
+                    callbackUrl = "",
+                    error = "Adresse publique non configurée — renseigne-la dans Paramètres avant de vérifier le webhook",
+                });
+
+            var (success, callbackUrl, error) = await _radarr.RegisterWebhookAsync(publicUrl);
+
+            return Ok(new { success, callbackUrl, error });
         }
 
         /// <summary>Statut de la configuration</summary>
         [HttpGet("status")]
         [RequirePermission(Permission.Admin)]
-        public async Task<IActionResult> GetStatus()
+        public IActionResult GetStatus()
         {
-            var existing = await _db.UserRadarr
-                .FirstOrDefaultAsync(r => r.IsActive);
-
-            return Ok(new { isConfigured = existing is not null });
+            return Ok(new { isConfigured = _config.GetRadarr() is not null });
         }
 
         // ─── Actions films (lecture — accessible à tout utilisateur avec CanRequest) ─
@@ -132,27 +124,27 @@ namespace swipefilm.Controllers
 
         [HttpGet]
         [RequirePermission(Permission.Admin)]
-        public async Task<IActionResult> GetConfig()
+        public IActionResult GetConfig()
         {
-            var existing = await _db.UserRadarr
-                .FirstOrDefaultAsync(r => r.IsActive);
-
-            if (existing is null)
+            var radarr = _config.GetRadarr();
+            if (radarr is null)
                 return NotFound(new { error = "Radarr non configuré" });
 
-            // ✅ Retourne l'URL déchiffrée mais PAS l'API key complète — sécurité
-            var url = _encryption.Decrypt(existing.UrlEncrypted);
-            var apiKey = _encryption.Decrypt(existing.ApiKeyEncrypted);
+            // ✅ Retourne l'URL mais PAS l'API key complète — sécurité
+            var apiKey = radarr.ApiKey;
 
             return Ok(new
             {
-                existing.Id,
-                Url = url,
-                ApiKeyHint = $"{apiKey[..4]}{"*".PadRight(apiKey.Length - 4, '*')}", // ex: "abc1****"
-                existing.IsActive,
-                existing.CreatedAt
+                Url = radarr.Url,
+                ApiKeyHint = apiKey.Length > 4
+                    ? $"{apiKey[..4]}{"*".PadRight(apiKey.Length - 4, '*')}"
+                    : "****",
+                IsConfigured = true,
+                DefaultQualityProfileId = radarr.DefaultQualityProfileId,
+                DefaultRootFolderPath = radarr.DefaultRootFolderPath,
             });
         }
+
         /// <summary>
         /// Liste les profils qualité disponibles sur Radarr — accessible aux
         /// demandeurs (pas seulement l'admin) pour choisir une qualité au
@@ -162,36 +154,11 @@ namespace swipefilm.Controllers
         [RequirePermission(Permission.CanRequest)]
         public async Task<IActionResult> GetQualityProfiles()
         {
-            var existing = await _db.UserRadarr
-                .FirstOrDefaultAsync(r => r.IsActive);
-            if (existing is null)
-                return NotFound(new { error = "Radarr non configuré" });
+            var profiles = await _radarr.GetQualityProfilesAsync();
+            if (profiles is null)
+                return NotFound(new { error = "Radarr non configuré ou injoignable" });
 
-            var url = _encryption.Decrypt(existing.UrlEncrypted);
-            var apiKey = _encryption.Decrypt(existing.ApiKeyEncrypted);
-
-            try
-            {
-                var http = _httpFactory.CreateClient();
-                var response = await http.GetAsync(
-                    $"{url}/api/v3/qualityprofile?apikey={apiKey}");
-
-                if (!response.IsSuccessStatusCode)
-                    return BadRequest(new { error = "Impossible de récupérer les profils" });
-
-                var json = await response.Content.ReadFromJsonAsync<JsonElement>();
-                var profiles = json.EnumerateArray().Select(p => new
-                {
-                    Id = p.GetProperty("id").GetInt32(),
-                    Name = p.GetProperty("name").GetString()
-                }).ToList();
-
-                return Ok(profiles);
-            }
-            catch (Exception ex)
-            {
-                return BadRequest(new { error = ex.Message });
-            }
+            return Ok(profiles.Select(p => new { Id = p.Id, Name = p.Name }));
         }
 
         /// <summary>Sauvegarder le profil et dossier par défaut</summary>
@@ -199,17 +166,12 @@ namespace swipefilm.Controllers
         [RequirePermission(Permission.Admin)]
         public async Task<IActionResult> SetPreferences([FromBody] ArrPreferencesDto dto)
         {
-            var existing = await _db.UserRadarr
-                .FirstOrDefaultAsync(r => r.IsActive);
-
-            if (existing is null)
+            if (_config.GetRadarr() is null)
                 return NotFound(new { error = "Radarr non configuré" });
 
-            existing.DefaultQualityProfileId = dto.QualityProfileId;
-            existing.DefaultQualityProfileName = dto.QualityProfileName;
-            existing.DefaultRootFolderPath = dto.RootFolderPath;
+            await _config.SetRadarrPreferencesAsync(
+                dto.QualityProfileId, dto.QualityProfileName, dto.RootFolderPath);
 
-            await _db.SaveChangesAsync();
             return Ok(new { message = "Préférences Radarr sauvegardées" });
         }
 
@@ -219,38 +181,17 @@ namespace swipefilm.Controllers
         [RequirePermission(Permission.CanRequest)]
         public async Task<IActionResult> GetRootFolders()
         {
-            var existing = await _db.UserRadarr
-                .FirstOrDefaultAsync(r => r.IsActive);
-            if (existing is null)
-                return NotFound(new { error = "Radarr non configuré" });
+            var folders = await _radarr.GetRootFoldersAsync();
+            if (folders is null)
+                return NotFound(new { error = "Radarr non configuré ou injoignable" });
 
-            var url = _encryption.Decrypt(existing.UrlEncrypted);
-            var apiKey = _encryption.Decrypt(existing.ApiKeyEncrypted);
-
-            try
+            return Ok(folders.Select(f => new
             {
-                var http = _httpFactory.CreateClient();
-                var response = await http.GetAsync(
-                    $"{url}/api/v3/rootfolder?apikey={apiKey}");
-
-                if (!response.IsSuccessStatusCode)
-                    return BadRequest(new { error = "Impossible de récupérer les dossiers" });
-
-                var json = await response.Content.ReadFromJsonAsync<JsonElement>();
-                var folders = json.EnumerateArray().Select(f => new
-                {
-                    Id = f.GetProperty("id").GetInt32(),
-                    Path = f.GetProperty("path").GetString(),
-                    FreeSpace = f.TryGetProperty("freeSpace", out var fs) ? fs.GetInt64() : 0,
-                    TotalSpace = f.TryGetProperty("totalSpace", out var ts) ? ts.GetInt64() : 0
-                }).ToList();
-
-                return Ok(folders);
-            }
-            catch (Exception ex)
-            {
-                return BadRequest(new { error = ex.Message });
-            }
+                Id = f.Id,
+                Path = f.Path,
+                FreeSpace = f.FreeSpace,
+                TotalSpace = f.TotalSpace
+            }));
         }
 
         /// <summary>Ajouter un film à Radarr directement (hors flux de demande — admin uniquement)</summary>
@@ -285,8 +226,8 @@ namespace swipefilm.Controllers
     public record AddMovieDto(string Title, int Year);
     public record BulkStatusDto(List<int> TmdbIds);
     public record ArrPreferencesDto(
-    int QualityProfileId,
-    string QualityProfileName,
-    string RootFolderPath
-);
+        int QualityProfileId,
+        string QualityProfileName,
+        string RootFolderPath
+    );
 }

@@ -16,20 +16,20 @@ namespace swipefilm.Controllers
         private readonly AppDbContext _db;
         private readonly UserManager<User> _userManager;
         private readonly AuthManager _authManager;
-        private readonly IServerConfigService _serverService;
+        private readonly IAppConfigService _config;
         private readonly IEncryptionService _encryption;
 
         public SetupController(
             AppDbContext db,
             UserManager<User> userManager,
             AuthManager authManager,
-            IServerConfigService serverService,
+            IAppConfigService config,
             IEncryptionService encryption)
         {
             _db = db;
             _userManager = userManager;
             _authManager = authManager;
-            _serverService = serverService;
+            _config = config;
             _encryption = encryption;
         }
 
@@ -37,11 +37,9 @@ namespace swipefilm.Controllers
         // Appelé au démarrage de l'app mobile pour savoir où rediriger
 
         [HttpGet("status")]
-        public async Task<IActionResult> GetStatus()
+        public IActionResult GetStatus()
         {
-            var setting = await _db.AppSettings.FindAsync("IsSetupComplete");
-            var isComplete = setting?.Value == "true";
-            return Ok(new { IsSetupComplete = isComplete });
+            return Ok(new { IsSetupComplete = _config.IsSetupComplete });
         }
 
         // ─── Étape 1 : compte admin ───────────────────────────────────
@@ -50,8 +48,7 @@ namespace swipefilm.Controllers
         public async Task<IActionResult> CreateAdmin([FromBody] CreateAdminDto dto)
         {
             // Bloque si déjà configuré
-            var setting = await _db.AppSettings.FindAsync("IsSetupComplete");
-            if (setting?.Value == "true")
+            if (_config.IsSetupComplete)
                 return BadRequest(new { Error = "L'application est déjà configurée" });
 
             // Vérifie qu'il n'y a pas déjà un admin
@@ -76,14 +73,42 @@ namespace swipefilm.Controllers
                 return BadRequest(result.Errors);
 
             await _userManager.AddToRoleAsync(user, "Admin");
+            await _authManager.SignInAsync(HttpContext, user);
 
             return Ok(new
             {
                 UserId = user.Id,
-                Token = _authManager.GenerateToken(user),
                 Message = "Compte admin créé — passez à l'étape serveur"
             });
         }
+
+        // ─── Étape 1b : Adresse publique ───────────────────────────────
+        // ✅ Toujours explicite, jamais deviné depuis Request.Host — une
+        // adresse détectée automatiquement (localhost, mauvais port derrière
+        // un profil https, etc.) a causé des échecs répétés d'enregistrement
+        // webhook chez Radarr/Sonarr. L'admin la renseigne ici une fois,
+        // modifiable ensuite dans Paramètres.
+
+        [HttpPost("public-url")]
+        public async Task<IActionResult> ConfigurePublicUrl([FromBody] SetupPublicUrlDto dto)
+        {
+            var admins = await _userManager.GetUsersInRoleAsync("Admin");
+            if (!admins.Any())
+                return BadRequest(new { Error = "Créez d'abord le compte admin (étape 1)" });
+
+            await _config.SetPublicUrlAsync(dto.Url);
+
+            return Ok(new
+            {
+                Message = "Adresse publique enregistrée",
+                NextStep = "media-server",
+                PublicUrl = _config.GetPublicUrl(),
+            });
+        }
+
+        [HttpPost("public-url/skip")]
+        public IActionResult SkipPublicUrl() =>
+            Ok(new { Message = "Adresse publique non renseignée", NextStep = "media-server" });
 
         // ─── Étape 2 : connexion serveur + import users ───────────────
 
@@ -91,8 +116,7 @@ namespace swipefilm.Controllers
         public async Task<IActionResult> ConfigureServer([FromBody] SetupServerDto dto)
         {
             Console.WriteLine(dto);
-            var setting = await _db.AppSettings.FindAsync("IsSetupComplete");
-            if (setting?.Value == "true")
+            if (_config.IsSetupComplete)
                 return BadRequest(new { Error = "L'application est déjà configurée" });
 
             // Récupère l'admin
@@ -102,10 +126,10 @@ namespace swipefilm.Controllers
                 return BadRequest(new { Error = "Créez d'abord le compte admin (étape 1)" });
 
             // ✅ Configure l'unique serveur de l'instance
-            ServerConfig server;
+            ServerSettings server;
             try
             {
-                server = await _serverService.ConfigureAsync(new AddServerDto(
+                server = await _config.ConfigureServerAsync(new AddServerDto(
                     FriendlyName: dto.FriendlyName,
                     Type: dto.Type,
                     ApiKey: dto.ApiKey,
@@ -119,25 +143,18 @@ namespace swipefilm.Controllers
                 return BadRequest(new { Error = $"Connexion impossible : {ex.Message}" });
             }
 
-            // ✅ Rechiffre à partir de ce que ConfigureAsync a réellement résolu et
-            // sauvegardé — dto.ApiKey peut être null (flux username/password), et
-            // dto.Url peut être vide pour Plex (résolu dynamiquement à l'auth).
-            var resolvedUrl = _encryption.Decrypt(server.UrlEncrypted);
-            var resolvedToken = _encryption.Decrypt(server.TokenEncrypted);
+            // ✅ Ce que ConfigureServerAsync a réellement résolu et sauvegardé —
+            // dto.ApiKey peut être null (flux username/password), et dto.Url
+            // peut être vide pour Plex (résolu dynamiquement à l'auth).
+            var resolvedUrl = server.Url;
+            var resolvedToken = server.Token;
 
             // Importe et synchronise les utilisateurs depuis Jellyfin/Plex
             var (imported, adminsImported) = await ImportUsersFromServerAsync(
                 server, dto.Type, resolvedUrl, resolvedToken);
 
             // Marque le setup comme terminé
-            if (setting is null)
-                _db.AppSettings.Add(new AppSettings
-                {
-                    Key = "IsSetupComplete",
-                    Value = "true"
-                });
-            else
-                setting.Value = "true";
+            await _config.MarkSetupCompleteAsync();
 
             var defaultPermSetting = await _db.AppSettings.FindAsync("DefaultPermissions");
             if (defaultPermSetting is null)
@@ -164,8 +181,7 @@ namespace swipefilm.Controllers
         [HttpPost("seerr")]
         public async Task<IActionResult> ConfigureSeerr([FromBody] SetupSeerrDto dto)
         {
-            var setting = await _db.AppSettings.FindAsync("IsSetupComplete");
-            if (setting?.Value != "true")
+            if (!_config.IsSetupComplete)
                 return BadRequest(new { Error = "Configurez d'abord le serveur (étape 2)" });
 
             var admins = await _userManager.GetUsersInRoleAsync("Admin");
@@ -228,7 +244,7 @@ namespace swipefilm.Controllers
         // ─── Import users depuis Jellyfin/Plex ───────────────────────
 
         private async Task<(int imported, int admins)> ImportUsersFromServerAsync(
-            ServerConfig server, ServerType type, string url, string apiKey)
+            ServerSettings server, ServerType type, string url, string apiKey)
         {
             int imported = 0;
             int adminCount = 0;
@@ -511,30 +527,24 @@ namespace swipefilm.Controllers
             if (!ok)
                 return BadRequest(new { Error = "Connexion Radarr impossible — vérifie l'URL et l'API key" });
 
-            var existing = await _db.UserRadarr
-                .FirstOrDefaultAsync(r => r.UserId == admin.Id);
+            await _config.SetRadarrAsync(dto.Url.TrimEnd('/'), dto.ApiKey);
 
-            if (existing is null)
-            {
-                _db.UserRadarr.Add(new UserRadarr
-                {
-                    Id = Guid.NewGuid(),
-                    UserId = admin.Id,
-                    UrlEncrypted = _encryption.Encrypt(dto.Url.TrimEnd('/')),
-                    ApiKeyEncrypted = _encryption.Encrypt(dto.ApiKey),
-                    IsActive = true,
-                    CreatedAt = DateTime.UtcNow
-                });
-            }
-            else
-            {
-                existing.UrlEncrypted = _encryption.Encrypt(dto.Url.TrimEnd('/'));
-                existing.ApiKeyEncrypted = _encryption.Encrypt(dto.ApiKey);
-                existing.IsActive = true;
-            }
+            var publicUrl = _config.GetPublicUrl();
+            bool webhookRegistered = false;
+            string? callbackUrl = null;
+            string? webhookError = "Adresse publique non configurée — le webhook n'a pas été enregistré automatiquement";
 
-            await _db.SaveChangesAsync();
-            return Ok(new { Message = "Radarr configuré", NextStep = "sonarr" });
+            if (publicUrl is not null)
+                (webhookRegistered, callbackUrl, webhookError) = await radarr.RegisterWebhookAsync(publicUrl);
+
+            return Ok(new
+            {
+                Message = "Radarr configuré",
+                NextStep = "sonarr",
+                WebhookRegistered = webhookRegistered,
+                CallbackUrl = callbackUrl,
+                WebhookError = webhookError,
+            });
         }
 
         [HttpPost("radarr/skip")]
@@ -555,53 +565,33 @@ namespace swipefilm.Controllers
             if (!ok)
                 return BadRequest(new { Error = "Connexion Sonarr impossible — vérifie l'URL et l'API key" });
 
-            var existing = await _db.UserSonarr
-                .FirstOrDefaultAsync(s => s.UserId == admin.Id);
+            await _config.SetSonarrAsync(dto.Url.TrimEnd('/'), dto.ApiKey);
 
-            if (existing is null)
-            {
-                _db.UserSonarr.Add(new UserSonarr
-                {
-                    Id = Guid.NewGuid(),
-                    UserId = admin.Id,
-                    UrlEncrypted = _encryption.Encrypt(dto.Url.TrimEnd('/')),
-                    ApiKeyEncrypted = _encryption.Encrypt(dto.ApiKey),
-                    IsActive = true,
-                    CreatedAt = DateTime.UtcNow
-                });
-            }
-            else
-            {
-                existing.UrlEncrypted = _encryption.Encrypt(dto.Url.TrimEnd('/'));
-                existing.ApiKeyEncrypted = _encryption.Encrypt(dto.ApiKey);
-                existing.IsActive = true;
-            }
+            var publicUrl = _config.GetPublicUrl();
+            bool webhookRegistered = false;
+            string? callbackUrl = null;
+            string? webhookError = "Adresse publique non configurée — le webhook n'a pas été enregistré automatiquement";
 
-            await _db.SaveChangesAsync();
+            if (publicUrl is not null)
+                (webhookRegistered, callbackUrl, webhookError) = await sonarr.RegisterWebhookAsync(publicUrl);
 
             // ✅ Marque le setup comme terminé après Sonarr (dernière étape)
-            var setting = await _db.AppSettings.FindAsync("IsSetupComplete");
-            if (setting is null)
-                _db.AppSettings.Add(new AppSettings { Key = "IsSetupComplete", Value = "true" });
-            else
-                setting.Value = "true";
+            await _config.MarkSetupCompleteAsync();
 
-            await _db.SaveChangesAsync();
-
-            return Ok(new { Message = "Sonarr configuré — setup terminé !" });
+            return Ok(new
+            {
+                Message = "Sonarr configuré — setup terminé !",
+                WebhookRegistered = webhookRegistered,
+                CallbackUrl = callbackUrl,
+                WebhookError = webhookError,
+            });
         }
 
         [HttpPost("sonarr/skip")]
         public async Task<IActionResult> SkipSonarr()
         {
             // ✅ Marque quand même le setup comme terminé
-            var setting = await _db.AppSettings.FindAsync("IsSetupComplete");
-            if (setting is null)
-                _db.AppSettings.Add(new AppSettings { Key = "IsSetupComplete", Value = "true" });
-            else
-                setting.Value = "true";
-
-            await _db.SaveChangesAsync();
+            await _config.MarkSetupCompleteAsync();
             return Ok(new { Message = "Setup terminé" });
         }
 
@@ -620,6 +610,8 @@ namespace swipefilm.Controllers
         string? Username = null,
         string? Password = null
     );
+
+    public record SetupPublicUrlDto(string? Url);
 
     public record SetupArrDto(string Url, string ApiKey);
 

@@ -27,6 +27,10 @@ interface ConnectFormProps {
   onSkip?: () => void;
   submitLabel?: string;
   skipLabel?: string;
+  // ✅ Sans carte/logo propres — pour un usage à l'intérieur d'une carte
+  // déjà fournie par le parent (voir onboarding/page.tsx). Le panneau
+  // Réglages (settings/page.tsx) garde sa propre carte, donc false par défaut.
+  bare?: boolean;
 }
 
 export function ConnectForm({
@@ -38,6 +42,7 @@ export function ConnectForm({
   onSkip,
   submitLabel = "Connecter",
   skipLabel,
+  bare = false,
 }: ConnectFormProps) {
   const [selected, setSelected] = useState(options[0]?.id ?? "");
   const [authMode, setAuthMode] = useState<AuthMode>("apikey");
@@ -85,14 +90,8 @@ export function ConnectForm({
     }
   }
 
-  return (
-    <div className="rounded-card border-border bg-surface/70 relative z-10 w-full max-w-md border p-8 shadow-2xl backdrop-blur-xl">
-      <div className="mb-4 text-center">
-        <span className="font-display text-text-primary text-xl font-bold">
-          Swipe<span className="text-accent">Film</span>
-        </span>
-      </div>
-
+  const content = (
+    <>
       <h1 className="font-display text-text-primary text-center text-xl font-semibold">
         {title}
       </h1>
@@ -265,6 +264,19 @@ export function ConnectForm({
           )}
         </div>
       </form>
+    </>
+  );
+
+  if (bare) return content;
+
+  return (
+    <div className="rounded-card border-border bg-surface/70 relative z-10 w-full max-w-md border p-8 shadow-2xl backdrop-blur-xl">
+      <div className="mb-4 text-center">
+        <span className="font-display text-text-primary text-xl font-bold">
+          Swipe<span className="text-accent">Film</span>
+        </span>
+      </div>
+      {content}
     </div>
   );
 }

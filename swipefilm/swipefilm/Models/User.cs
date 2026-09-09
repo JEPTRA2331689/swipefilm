@@ -42,6 +42,10 @@ public class User : IdentityUser<Guid>
     // ─── Comportement automatique ─────────────────────────────────
     /// <summary>Swipe droit → ajout automatique à Radarr si AutoApprove</summary>
     public bool AutoRequestOnSwipe { get; set; } = false;
+
+    /// <summary>Compte éphémère provisionné pour rejoindre une session de
+    /// groupe sans créer de vrai compte — nettoyable par job planifié.</summary>
+    public bool IsGuest { get; set; } = false;
     /// <summary>Vérifie une permission spécifique</summary>
     public bool HasPermission(Permission permission)
         => PermissionHelper.HasPermission(Permissions, permission);

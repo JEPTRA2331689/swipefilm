@@ -32,6 +32,12 @@ namespace swipefilm.Data.Configurations
                 .HasForeignKey(s => s.SeriesId)
                 .OnDelete(DeleteBehavior.Cascade);
 
+            // Session de groupe — null pour un swipe solo
+            builder.HasOne(s => s.Session)
+                .WithMany(sess => sess.Swipes)
+                .HasForeignKey(s => s.SessionId)
+                .OnDelete(DeleteBehavior.SetNull);
+
             // Exactement un des deux doit être renseigné, jamais les deux ni aucun
             builder.ToTable(t => t.HasCheckConstraint(
                 "ck_swipes_movie_xor_series",

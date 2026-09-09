@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { api } from "@/lib/api";
 import type { Movie } from "@/types";
 import { PosterSlider } from "./PosterSlider";
 
@@ -8,15 +9,11 @@ export function PosterBackdrop() {
   const [posters, setPosters] = useState<Movie[]>([]);
 
   useEffect(() => {
-    fetch("/api/tmdb/popular")
-      .then((res) => res.json())
-      .then((data) => {
-        if (Array.isArray(data.posters)) setPosters(data.posters);
-      })
+    api
+      .get<{ posters: Movie[] }>("/api/tmdb/popular", { skipAuth: true })
+      .then((data) => setPosters(data.posters))
       .catch(() => {});
   }, []);
-
-  console.log(posters);
 
   return (
     <div className="absolute inset-0 overflow-hidden" aria-hidden="true">

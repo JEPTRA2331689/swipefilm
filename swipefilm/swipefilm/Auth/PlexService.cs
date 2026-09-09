@@ -4,11 +4,11 @@ namespace swipefilm.Auth
 {
     public class PlexService : IMediaServerService
     {
-        private readonly IServerConfigService _serverService;
+        private readonly IAppConfigService _serverService;
         private readonly HttpClient _http;
 
         public PlexService(
-            IServerConfigService serverService,
+            IAppConfigService serverService,
             IHttpClientFactory httpClientFactory)
         {
             _serverService = serverService;
@@ -23,8 +23,8 @@ namespace swipefilm.Auth
         public async Task<List<MediaItem>> GetLibraryIncrementalAsync(
             DateTime? since, string? userId)
         {
-            var (url, token) = await _serverService
-                .GetDecryptedCredentialsAsync();
+            var (url, token) = _serverService
+                .GetServerCredentials();
 
             var sections = await GetLibrarySectionsAsync(url, token);
             var items = new List<MediaItem>();
@@ -49,7 +49,7 @@ namespace swipefilm.Auth
         // une fois et mis en cache sur ServerConfig.MachineIdentifier.
         public async Task<string?> GetMachineIdentifierAsync()
         {
-            var (url, token) = await _serverService.GetDecryptedCredentialsAsync();
+            var (url, token) = _serverService.GetServerCredentials();
 
             try
             {
@@ -170,8 +170,8 @@ namespace swipefilm.Auth
         public async Task<List<WatchHistoryItem>> GetWatchHistoryIncrementalAsync(
             DateTime? since, string? userId)
         {
-            var (url, token) = await _serverService
-                .GetDecryptedCredentialsAsync();
+            var (url, token) = _serverService
+                .GetServerCredentials();
 
             var items = new List<WatchHistoryItem>();
             int start = 0;
@@ -232,6 +232,70 @@ namespace swipefilm.Auth
         Done:
             Console.WriteLine($"[Plex] {items.Count} items avec historique");
             return items;
+        }
+
+        // ✅ Best-effort — non testé contre un vrai serveur Plex (l'instance
+        // configurée pour ce projet est Jellyfin). /status/sessions/history/all
+        // ne renvoie que des événements par ÉPISODE (jamais un agrégat par
+        // série comme le fait Jellyfin) — grandparentRatingKey est l'attribut
+        // Plex standard pointant vers la série parente d'un épisode. À vérifier
+        // sur un vrai serveur si la sync séries Plex semble incomplète.
+        public async Task<HashSet<string>> GetRecentlyWatchedSeriesServerIdsAsync(
+            DateTime? since, string? userId)
+        {
+            var result = new HashSet<string>();
+            var (url, token) = _serverService.GetServerCredentials();
+
+            int start = 0;
+            const int pageSize = 100;
+            int total;
+            int consecutiveOld = 0;
+            const int stopAfter = 20;
+
+            var sinceParam = since.HasValue
+                ? $"&viewedAt>={new DateTimeOffset(since.Value).ToUnixTimeSeconds()}"
+                : "";
+
+            do
+            {
+                var response = await _http.GetAsync(
+                    $"{url}/status/sessions/history/all" +
+                    $"?X-Plex-Token={token}" +
+                    $"&sort=viewedAt:desc" +
+                    $"&X-Plex-Container-Start={start}" +
+                    $"&X-Plex-Container-Size={pageSize}" +
+                    sinceParam);
+
+                if (!response.IsSuccessStatusCode) break;
+
+                var doc = XDocument.Parse(await response.Content.ReadAsStringAsync());
+                total = int.Parse(doc.Root?.Attribute("totalSize")?.Value ?? "0");
+
+                foreach (var item in doc.Descendants("Video"))
+                {
+                    if (since.HasValue
+                        && long.TryParse(item.Attribute("viewedAt")?.Value, out var viewedAt))
+                    {
+                        var viewedDate = DateTimeOffset.FromUnixTimeSeconds(viewedAt).UtcDateTime;
+                        if (viewedDate < since.Value)
+                        {
+                            consecutiveOld++;
+                            if (consecutiveOld >= stopAfter) return result;
+                            continue;
+                        }
+                        consecutiveOld = 0;
+                    }
+
+                    var seriesKey = item.Attribute("grandparentRatingKey")?.Value;
+                    if (!string.IsNullOrEmpty(seriesKey))
+                        result.Add(seriesKey);
+                }
+
+                start += pageSize;
+
+            } while (start < total);
+
+            return result;
         }
 
         private async Task<WatchHistoryItem?> ParseWatchHistoryAsync(
@@ -335,7 +399,7 @@ namespace swipefilm.Auth
         public async Task<List<SeasonItem>> GetSeasonsAsync(
             string seriesServerId, string? userId)
         {
-            var (url, token) = await _serverService.GetDecryptedCredentialsAsync();
+            var (url, token) = _serverService.GetServerCredentials();
 
             var response = await _http.GetAsync(
                 $"{url}/library/metadata/{seriesServerId}/children" +
@@ -387,8 +451,8 @@ namespace swipefilm.Auth
 
         public async Task<string> GetStreamUrlAsync(string itemId)
         {
-            var (url, token) = await _serverService
-                .GetDecryptedCredentialsAsync();
+            var (url, token) = _serverService
+                .GetServerCredentials();
 
             return $"{url}/library/parts/{itemId}/file?X-Plex-Token={token}";
         }

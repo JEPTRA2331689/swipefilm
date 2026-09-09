@@ -18,18 +18,20 @@ namespace swipefilm.Auth
         // boucle sur chaque utilisateur ayant un compte sur ce serveur.
 
         public async Task SyncServerAsync(
-            ServerConfig server,
+            ServerSettings server,
             IMediaServerService mediaService,
+            IAppConfigService config,
             DateTime? since,
             AppDbContext db)
         {
             // ✅ Récupéré une seule fois — nécessaire pour construire un lien
             // direct vers une fiche Plex (voir MovieController/SeriesController)
+            string? newMachineIdentifier = null;
             if (server.Type == ServerType.Plex
                 && string.IsNullOrEmpty(server.MachineIdentifier)
                 && mediaService is PlexService plexForIdentifier)
             {
-                server.MachineIdentifier = await plexForIdentifier.GetMachineIdentifierAsync();
+                newMachineIdentifier = await plexForIdentifier.GetMachineIdentifierAsync();
             }
 
             var users = await db.Users
@@ -55,11 +57,10 @@ namespace swipefilm.Auth
                     ? user.JellyfinUserId : user.PlexUserId;
 
                 await SyncWatchHistoryForUserAsync(user.Id, mediaService, userServerId, since, db);
-                await SyncSeriesWatchHistoryForUserAsync(user.Id, mediaService, userServerId, db);
+                await SyncSeriesWatchHistoryForUserAsync(user.Id, mediaService, userServerId, since, db);
             }
 
-            server.LastSyncAt = DateTime.UtcNow;
-            await db.SaveChangesAsync();
+            await config.UpdateServerSyncInfoAsync(newMachineIdentifier, DateTime.UtcNow);
         }
 
         // ─── Sync bibliothèque (système-wide) ──────────────────────────
@@ -453,6 +454,7 @@ namespace swipefilm.Auth
             Guid userId,
             IMediaServerService mediaService,
             string? userServerId,
+            DateTime? since,
             AppDbContext db)
         {
             if (string.IsNullOrEmpty(userServerId)) return;
@@ -464,6 +466,26 @@ namespace swipefilm.Auth
                 .ToListAsync();
 
             if (!seriesInLibrary.Any()) return;
+
+            // ✅ En incrémental, ne rappelle GetSeasonsAsync (un appel réseau par
+            // série) que pour les séries ayant eu de l'activité depuis `since` —
+            // avant ce filtre, TOUTE la bibliothèque était rescannée à chaque
+            // passage (toutes les 5 min via Hangfire), peu importe `since`.
+            if (since.HasValue)
+            {
+                var recentlyTouched = await mediaService
+                    .GetRecentlyWatchedSeriesServerIdsAsync(since, userServerId);
+
+                seriesInLibrary = seriesInLibrary
+                    .Where(s => recentlyTouched.Contains(s.ServerItemId!))
+                    .ToList();
+
+                if (!seriesInLibrary.Any())
+                {
+                    Console.WriteLine("[Sync] SeriesWatchHistory — aucune série avec activité récente");
+                    return;
+                }
+            }
 
             var existingHistory = await db.SeriesWatchHistory
                 .Where(w => w.UserId == userId)
@@ -521,6 +543,10 @@ namespace swipefilm.Auth
                 db.SeriesWatchHistory.AddRange(newHistory);
 
             await db.SaveChangesAsync();
+
+            Console.WriteLine(
+                $"[Sync] SeriesWatchHistory — {seriesInLibrary.Count} série(s) vérifiée(s), " +
+                $"{newHistory.Count} nouvelle(s) ligne(s) d'historique");
         }
     }
 }

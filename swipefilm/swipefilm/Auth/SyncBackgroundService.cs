@@ -30,8 +30,9 @@ namespace swipefilm.Auth
         {
             using var scope = _services.CreateScope();
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var config = scope.ServiceProvider.GetRequiredService<IAppConfigService>();
 
-            var server = await db.ServerConfig.FirstOrDefaultAsync();
+            var server = config.GetServer();
             if (server is null) return;
 
             IMediaServerService mediaService = server.Type == ServerType.Jellyfin
@@ -42,7 +43,7 @@ namespace swipefilm.Auth
             var syncService = new SyncService();
 
             await syncService.SyncServerAsync(
-                server, mediaService, server.LastSyncAt, db);
+                server, mediaService, config, server.LastSyncAt, db);
 
             var tmdbService = scope.ServiceProvider.GetRequiredService<TmdbService>();
             await tmdbService.EnrichAllMoviesAsync();

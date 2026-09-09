@@ -2,6 +2,7 @@
 using System.Text.Json;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using swipefilm.Auth;
 using swipefilm.Data;
 using swipefilm.Models;
 
@@ -18,22 +19,30 @@ namespace swipefilm.Controllers
     public class SonarrWebhookController : ControllerBase
     {
         private readonly AppDbContext _db;
-        private readonly IConfiguration _config;
+        private readonly IAppConfigService _config;
         private readonly ILogger<SonarrWebhookController> _logger;
 
         public SonarrWebhookController(
-            AppDbContext db, IConfiguration config, ILogger<SonarrWebhookController> logger)
+            AppDbContext db, IAppConfigService config, ILogger<SonarrWebhookController> logger)
         {
             _db = db;
             _config = config;
             _logger = logger;
         }
 
+        // ✅ Même raisonnement que RadarrWebhookController.Ping — sans handler
+        // GET explicite, une visite navigateur retombe sur le MapFallback du
+        // frontend (page web) au lieu d'un message clair. N'affecte pas
+        // Sonarr, qui n'envoie que du POST.
+        [HttpGet]
+        public IActionResult Ping() =>
+            Ok(new { message = "Endpoint webhook Sonarr — attend un POST de Sonarr, pas une visite navigateur." });
+
         [HttpPost]
         public async Task<IActionResult> Receive(
             [FromQuery] string? token, [FromBody] JsonElement body)
         {
-            var expected = _config["Webhooks:SonarrToken"];
+            var expected = _config.GetSonarr()?.WebhookToken;
             if (string.IsNullOrEmpty(expected) || token != expected)
                 return Unauthorized();
 

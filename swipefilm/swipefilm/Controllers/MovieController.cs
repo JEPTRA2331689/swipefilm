@@ -17,13 +17,13 @@ namespace swipefilm.Controllers
     {
         private readonly AppDbContext _db;
         private readonly TmdbService _tmdb;
-        private readonly IEncryptionService _encryption;
+        private readonly IAppConfigService _config;
 
-        public MovieController(AppDbContext db, TmdbService tmdb, IEncryptionService encryption)
+        public MovieController(AppDbContext db, TmdbService tmdb, IAppConfigService config)
         {
             _db = db;
             _tmdb = tmdb;
-            _encryption = encryption;
+            _config = config;
         }
 
         private Guid CurrentUserId =>
@@ -58,11 +58,11 @@ namespace swipefilm.Controllers
 
             if (serverMovie is not null)
             {
-                var serverConfig = await _db.ServerConfig.FirstOrDefaultAsync();
+                var serverConfig = _config.GetServer();
                 if (serverConfig is not null)
                 {
                     var url = ExternalLinkHelper.BuildDeepLink(
-                        serverConfig.Type, _encryption.Decrypt(serverConfig.UrlEncrypted),
+                        serverConfig.Type, serverConfig.Url,
                         serverConfig.MachineIdentifier, serverMovie.ServerItemId);
 
                     if (serverConfig.Type == ServerType.Jellyfin) jellyfinUrl = url;

@@ -16,10 +16,14 @@
         public SwipeContext ContextMode { get; set; }
         public DateTime CreatedAt { get; set; }
 
+        /// <summary>Renseigné si le swipe a eu lieu dans une session de groupe — null en solo.</summary>
+        public Guid? SessionId { get; set; }
+
         // Navigation
         public User User { get; set; } = null!;
         public Movie? Movie { get; set; }
         public Series? Series { get; set; }
+        public Session? Session { get; set; }
     }
 
     public enum SwipeDirection { Left, Right }

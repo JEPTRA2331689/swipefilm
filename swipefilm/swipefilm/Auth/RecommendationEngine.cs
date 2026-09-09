@@ -783,6 +783,167 @@ namespace swipefilm.Auth
             return (ApplyMix(scored, count, profile), available);
         }
 
+        // ─── GetSectionPageAsync ──────────────────────────────────────
+        // ✅ Utilisé pour "voir plus" (une section précise, films OU séries)
+        // et l'exploration par genre — réutilise exactement le même chemin
+        // de scoring que la home (BuildSectionFastAsync/BuildSeriesSectionFastAsync,
+        // enrichissement TMDB live inclus) plutôt que d'en dupliquer un.
+        public async Task<HomeSection?> GetSectionPageAsync(
+            Guid userId, SectionProfile profile, int count, bool isSeries,
+            AvailabilityFilter availability = AvailabilityFilter.All,
+            HashSet<int>? sessionExcluded = null)
+        {
+            await using var db = await _dbFactory.CreateDbContextAsync();
+            var user = await db.Users.FindAsync(userId);
+            var locale = $"{user?.Locale ?? "fr"}-{user?.Region ?? "FR"}";
+
+            if (isSeries)
+            {
+                var seriesProfile = await GetOrCreateSeriesProfileAsync(userId, db);
+                var available = await GetAvailableSeriesAsync(db);
+                var excluded = await GetExcludedSeriesAsync(userId, profile, db);
+                if (sessionExcluded?.Any() == true) excluded.UnionWith(sessionExcluded);
+
+                return await BuildSeriesSectionFastAsync(
+                    profile, count, availability, seriesProfile, available, excluded, locale);
+            }
+
+            var userProfile = await GetOrCreateProfileAsync(userId, db);
+            var availableMovies = await GetAvailableMoviesAsync(db);
+            var excludedMovies = await GetExcludedMoviesAsync(userId, profile, db);
+            if (sessionExcluded?.Any() == true) excludedMovies.UnionWith(sessionExcluded);
+
+            return await BuildSectionFastAsync(
+                userId, profile, count, availability, userProfile, availableMovies, excludedMovies, locale);
+        }
+
+        // ─── GetGenreCardsAsync ───────────────────────────────────────
+        // ✅ Une carte par genre présent en catalogue disponible — backdrop du
+        // film le mieux noté de ce genre (même principe qu'Overseerr : pas
+        // d'image dédiée au genre, on emprunte celle d'un titre représentatif).
+        public async Task<List<(string Genre, string? BackdropPath)>> GetGenreCardsAsync()
+        {
+            await using var db = await _dbFactory.CreateDbContextAsync();
+            var availableIds = await GetAvailableMoviesAsync(db);
+
+            var candidates = await db.Movies
+                .Where(m => availableIds.Contains(m.TmdbId) && m.BackdropPath != null)
+                .OrderByDescending(m => m.TmdbRating)
+                .Select(m => new { m.Genres, m.BackdropPath })
+                .ToListAsync();
+
+            // ✅ Un film peut appartenir à plusieurs genres (Action + Aventure…) —
+            // sans garde-fou, son backdrop se retrouve représentant plusieurs
+            // cartes à la fois. Chaque film ne sert donc qu'un seul genre : le
+            // premier de sa liste encore sans image.
+            var byGenre = new Dictionary<string, string?>();
+            var usedBackdrops = new HashSet<string>();
+            foreach (var m in candidates)
+            {
+                if (usedBackdrops.Contains(m.BackdropPath!)) continue;
+
+                var genre = m.Genres.FirstOrDefault(g => !byGenre.ContainsKey(g));
+                if (genre is null) continue;
+
+                byGenre[genre] = m.BackdropPath;
+                usedBackdrops.Add(m.BackdropPath!);
+            }
+
+            return byGenre
+                .Select(kv => (Genre: kv.Key, BackdropPath: kv.Value))
+                .OrderBy(g => g.Genre)
+                .ToList();
+        }
+
+        // ─── Sessions de groupe ─────────────────────────────────────────
+        // Même pipeline de scoring qu'une section personnelle (BuildSectionFastAsync/
+        // BuildSeriesSectionFastAsync, donc BuildCandidatesAsync/ComputeScore) mais
+        // avec un UserProfile/UserSeriesProfile transitoire — jamais persisté,
+        // jamais mis en cache sous un vrai UserId.
+
+        /// <summary>
+        /// Agrège les swipes d'une session de groupe (tous membres confondus) en
+        /// un profil de goût "du groupe", avec exactement le même calcul de
+        /// signal que UpdateProfileFromHistoryAsync/UpdateSeriesProfileAsync —
+        /// seule la source (swipes de la session plutôt que d'un seul user) change.
+        /// </summary>
+        public async Task<(UserProfile MovieProfile, UserSeriesProfile SeriesProfile)> BuildGroupSessionProfilesAsync(
+            Guid sessionId, AppDbContext? db = null)
+        {
+            db ??= _db;
+
+            var movieProfile = new UserProfile { Id = Guid.NewGuid(), UpdatedAt = DateTime.UtcNow };
+            var seriesProfile = new UserSeriesProfile { Id = Guid.NewGuid(), UpdatedAt = DateTime.UtcNow };
+
+            var swipes = await db.Swipes
+                .Include(s => s.Movie)
+                .Include(s => s.Series)
+                .Where(s => s.SessionId == sessionId)
+                .ToListAsync();
+
+            foreach (var swipe in swipes.Where(s => s.Movie != null))
+            {
+                float signal = swipe.Direction == SwipeDirection.Right
+                    ? swipe.DurationMs < 1500 ? 0.4f : 0.3f
+                    : swipe.DurationMs < 1500 ? -0.2f : -0.12f;
+
+                UpdateWeightsIncremental(swipe.Movie!.Genres, signal, movieProfile.GenreWeights, movieProfile.GenreCounts);
+                UpdateWeightsIncremental(swipe.Movie.Directors, signal, movieProfile.DirectorWeights, movieProfile.DirectorCounts);
+                UpdateWeightsIncremental(swipe.Movie.CastTop5, signal, movieProfile.ActorWeights, movieProfile.ActorCounts);
+                UpdateWeightsIncremental(swipe.Movie.Keywords, signal, movieProfile.KeywordWeights, movieProfile.KeywordCounts);
+                movieProfile.TotalSignals++;
+            }
+            movieProfile.GenreWeights = Normalize(movieProfile.GenreWeights, movieProfile.GenreCounts);
+            movieProfile.DirectorWeights = Normalize(movieProfile.DirectorWeights, movieProfile.DirectorCounts);
+            movieProfile.ActorWeights = Normalize(movieProfile.ActorWeights, movieProfile.ActorCounts);
+            movieProfile.KeywordWeights = Normalize(movieProfile.KeywordWeights, movieProfile.KeywordCounts);
+
+            foreach (var swipe in swipes.Where(s => s.Series != null))
+            {
+                float signal = swipe.Direction == SwipeDirection.Right
+                    ? swipe.DurationMs < 1500 ? 0.4f : 0.3f
+                    : swipe.DurationMs < 1500 ? -0.28f : -0.12f;
+
+                UpdateWeightsIncremental(swipe.Series!.Genres, signal, seriesProfile.GenreWeights, seriesProfile.GenreCounts);
+                UpdateWeightsIncremental(swipe.Series.CreatedBy, signal, seriesProfile.CreatorWeights, seriesProfile.CreatorCounts);
+                UpdateWeightsIncremental(swipe.Series.CastTop5, signal, seriesProfile.ActorWeights, seriesProfile.ActorCounts);
+                UpdateWeightsIncremental(swipe.Series.Keywords, signal, seriesProfile.KeywordWeights, seriesProfile.KeywordCounts);
+                seriesProfile.TotalSeriesSignals++;
+            }
+            seriesProfile.GenreWeights = Normalize(seriesProfile.GenreWeights, seriesProfile.GenreCounts);
+            seriesProfile.CreatorWeights = Normalize(seriesProfile.CreatorWeights, seriesProfile.CreatorCounts);
+            seriesProfile.ActorWeights = Normalize(seriesProfile.ActorWeights, seriesProfile.ActorCounts);
+            seriesProfile.KeywordWeights = Normalize(seriesProfile.KeywordWeights, seriesProfile.KeywordCounts);
+
+            return (movieProfile, seriesProfile);
+        }
+
+        /// <summary>
+        /// Construit une section scorée à partir d'un profil explicite (le profil
+        /// de groupe ci-dessus, ou tout autre) au lieu de charger le profil d'un
+        /// utilisateur réel — même pipeline que GetSectionPageAsync sinon.
+        /// </summary>
+        public async Task<HomeSection?> BuildGroupSectionAsync(
+            SectionProfile section, int count, bool isSeries,
+            UserProfile? movieProfile, UserSeriesProfile? seriesProfile,
+            HashSet<int> excluded, string locale = "fr-FR")
+        {
+            await using var db = await _dbFactory.CreateDbContextAsync();
+
+            if (isSeries)
+            {
+                var available = await GetAvailableSeriesAsync(db);
+                return await BuildSeriesSectionFastAsync(
+                    section, count, AvailabilityFilter.All,
+                    seriesProfile ?? new UserSeriesProfile(), available, excluded, locale);
+            }
+
+            var availableMovies = await GetAvailableMoviesAsync(db);
+            return await BuildSectionFastAsync(
+                Guid.Empty, section, count, AvailabilityFilter.All,
+                movieProfile ?? new UserProfile(), availableMovies, excluded, locale);
+        }
+
         // ─── GetBasedOnMovieIdsAsync ──────────────────────────────────
         // Plusieurs films pivots pour générer plusieurs sections
         // "Parce que vous avez aimé X", au lieu d'un seul.

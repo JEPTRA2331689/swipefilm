@@ -5,11 +5,11 @@ namespace swipefilm.Auth
 {
     public class JellyfinService : IMediaServerService
     {
-        private readonly IServerConfigService _serverService;
+        private readonly IAppConfigService _serverService;
         private readonly HttpClient _http;
 
         public JellyfinService(
-            IServerConfigService serverService,
+            IAppConfigService serverService,
             IHttpClientFactory httpClientFactory)
         {
             _serverService = serverService;
@@ -20,7 +20,7 @@ namespace swipefilm.Auth
 
         public async Task<List<MediaItem>> GetLibraryAsync(string? userId)
         {
-            var (url, token) = await _serverService.GetDecryptedCredentialsAsync();
+            var (url, token) = _serverService.GetServerCredentials();
 
             // ✅ Si userId null → endpoint admin (pas besoin d'un user spécifique)
             // GET /Items retourne tous les films de la bibliothèque
@@ -63,7 +63,7 @@ namespace swipefilm.Auth
         // Dans Auth/JellyfinService.cs — nouvelle méthode publique
         public async Task<(string locale, string region)> GetServerLocaleAsync()
         {
-            var (url, token) = await _serverService.GetDecryptedCredentialsAsync();
+            var (url, token) = _serverService.GetServerCredentials();
 
             try
             {
@@ -101,8 +101,8 @@ namespace swipefilm.Auth
             if (since is null)
                 return await GetLibraryAsync(userId);
 
-            var (url, token) = await _serverService
-                .GetDecryptedCredentialsAsync();
+            var (url, token) = _serverService
+                .GetServerCredentials();
 
             var items = new List<MediaItem>();
             int startIndex = 0;
@@ -190,8 +190,8 @@ namespace swipefilm.Auth
                 return new List<WatchHistoryItem>();
             }
 
-            var (url, token) = await _serverService
-                .GetDecryptedCredentialsAsync();
+            var (url, token) = _serverService
+                .GetServerCredentials();
 
 
             // ✅ UserData inclus directement dans la liste — plus d'appel séparé
@@ -358,12 +358,84 @@ namespace swipefilm.Auth
             );
         }
 
+        // ─── Séries avec activité récente ──────────────────────────────
+        // ✅ Même pattern que GetWatchHistoryIncrementalAsync (pagination,
+        // arrêt anticipé) mais IncludeItemTypes=Series uniquement, et on ne
+        // garde que l'Id — sert à ne pas rappeler GetSeasonsAsync pour toute
+        // la bibliothèque à chaque sync (voir SyncSeriesWatchHistoryForUserAsync).
+
+        public async Task<HashSet<string>> GetRecentlyWatchedSeriesServerIdsAsync(
+            DateTime? since, string? userId)
+        {
+            var result = new HashSet<string>();
+            if (string.IsNullOrEmpty(userId)) return result;
+
+            var (url, token) = _serverService.GetServerCredentials();
+
+            int startIndex = 0;
+            const int pageSize = 100;
+            int total;
+            int consecutiveUnchanged = 0;
+            const int stopAfter = 20;
+
+            var dateFilter = since.HasValue
+                ? $"&MinLastSavedDate={since.Value.ToUniversalTime():yyyy-MM-ddTHH:mm:ssZ}"
+                : "";
+
+            do
+            {
+                var response = await _http.GetAsync(
+                    $"{url}/Users/{userId}/Items" +
+                    $"?IncludeItemTypes=Series" +
+                    $"&Recursive=true" +
+                    $"&Fields=UserData" +
+                    $"&SortBy=DatePlayed" +
+                    $"&SortOrder=Descending" +
+                    dateFilter +
+                    $"&StartIndex={startIndex}" +
+                    $"&Limit={pageSize}" +
+                    $"&api_key={token}");
+
+                if (!response.IsSuccessStatusCode) break;
+
+                var json = await response.Content.ReadFromJsonAsync<JsonElement>();
+                total = json.GetProperty("TotalRecordCount").GetInt32();
+
+                foreach (var item in json.GetProperty("Items").EnumerateArray())
+                {
+                    var hasActivity = item.TryGetProperty("UserData", out var userData)
+                        && ((userData.TryGetProperty("PlayCount", out var pc) && pc.GetInt32() > 0)
+                            || (userData.TryGetProperty("PlaybackPositionTicks", out var pos) && pos.GetInt64() > 0)
+                            || (userData.TryGetProperty("Played", out var p) && p.GetBoolean())
+                            || (userData.TryGetProperty("IsFavorite", out var fav) && fav.GetBoolean()));
+
+                    if (!hasActivity)
+                    {
+                        if (since.HasValue)
+                        {
+                            consecutiveUnchanged++;
+                            if (consecutiveUnchanged >= stopAfter) return result;
+                        }
+                        continue;
+                    }
+
+                    consecutiveUnchanged = 0;
+                    result.Add(item.GetProperty("Id").GetString()!);
+                }
+
+                startIndex += pageSize;
+
+            } while (startIndex < total);
+
+            return result;
+        }
+
         // ─── Saisons ──────────────────────────────────────────────────
 
         public async Task<List<SeasonItem>> GetSeasonsAsync(
             string seriesServerId, string? userId)
         {
-            var (url, token) = await _serverService.GetDecryptedCredentialsAsync();
+            var (url, token) = _serverService.GetServerCredentials();
 
             var endpoint = !string.IsNullOrEmpty(userId)
                 ? $"{url}/Shows/{seriesServerId}/Seasons?userId={userId}"
@@ -425,8 +497,8 @@ namespace swipefilm.Auth
 
         public async Task<string> GetStreamUrlAsync(string itemId)
         {
-            var (url, token) = await _serverService
-                .GetDecryptedCredentialsAsync();
+            var (url, token) = _serverService
+                .GetServerCredentials();
 
             return $"{url}/Videos/{itemId}/stream?api_key={token}&static=true";
         }

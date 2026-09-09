@@ -1,10 +1,20 @@
 "use client";
 
 import { useState, useEffect, useCallback, useRef } from "react";
+import {
+  Shuffle,
+  CircleCheck,
+  Download,
+  Globe,
+  ThumbsUp,
+  ThumbsDown,
+  PlayCircle,
+  type LucideIcon,
+} from "lucide-react";
 import { TopNav } from "@/components/layout/TopNav";
 import { SwipeFocusRail } from "@/components/movie/SwipeFocusRail";
 import { SwipeActionButtons } from "@/components/movie/SwipeActionButtons";
-import { Button } from "@/components/ui/Button";
+import { Button, ButtonLink } from "@/components/ui/Button";
 import { api } from "@/lib/api";
 import { useAppStore } from "@/lib/store";
 import { cn } from "@/lib/utils";
@@ -13,11 +23,11 @@ import type { AvailabilityFilter, Movie } from "@/types";
 const AVAILABILITY_OPTIONS: {
   value: AvailabilityFilter;
   label: string;
-  icon: string;
+  icon: LucideIcon;
 }[] = [
-  { value: 0, label: "Mix", icon: "ph-thin ph-shuffle" },
-  { value: 1, label: "Disponibles", icon: "ph-thin ph-check-circle" },
-  { value: 2, label: "À découvrir", icon: "ph-thin ph-download-simple" },
+  { value: 0, label: "Mix", icon: Shuffle },
+  { value: 1, label: "Disponibles", icon: CircleCheck },
+  { value: 2, label: "À découvrir", icon: Download },
 ];
 
 const AUTO_UPDATE_AFTER = 3; // swipes avant mise à jour profil auto
@@ -40,10 +50,10 @@ export default function SwipePage() {
 
   // ── Fallback TMDB popular ─────────────────────────────────────
   const loadTmdbPopular = useCallback(async (page = 1) => {
-    const data = (await fetch(`/api/tmdb/popular?page=${page}`).then((r) =>
-      r.json(),
-    )) as Movie[];
-    return data;
+    const data = await api.get<{ posters: Movie[] }>(
+      `/api/tmdb/popular?page=${page}`,
+    );
+    return data.posters;
   }, []);
 
   // ── Chargement des films ──────────────────────────────────────
@@ -189,7 +199,7 @@ export default function SwipePage() {
                   "border-accent bg-accent/15 text-accent shadow-glow-sm",
               )}
             >
-              <i className={opt.icon} aria-hidden="true" /> {opt.label}
+              <opt.icon className="size-4" aria-hidden="true" /> {opt.label}
             </Button>
           ))}
         </div>
@@ -198,14 +208,14 @@ export default function SwipePage() {
           {/* Badge fallback TMDB */}
           {isTmdbFallback && (
             <span className="text-text-secondary/60 border-border rounded-pill flex items-center gap-1.5 border px-2.5 py-1 text-xs">
-              <i className="ph-thin ph-globe" aria-hidden="true" /> TMDB ·
+              <Globe className="size-4" aria-hidden="true" /> TMDB ·
               Populaires
             </span>
           )}
           {/* Badge profil mis à jour */}
           {profileUpdated && (
             <span className="text-success flex animate-pulse items-center gap-1.5 text-xs">
-              <i className="ph-thin ph-check-circle" aria-hidden="true" />{" "}
+              <CircleCheck className="size-4" aria-hidden="true" />{" "}
               Profil mis à jour
             </span>
           )}
@@ -226,15 +236,11 @@ export default function SwipePage() {
               lastAction === "like" ? "bg-swipe-like/8" : "bg-swipe-skip/8",
             )}
           >
-            <i
-              className={cn(
-                "text-7xl opacity-80",
-                lastAction === "like"
-                  ? "ph-thin ph-thumbs-up"
-                  : "ph-thin ph-thumbs-down",
-              )}
-              aria-hidden="true"
-            />
+            {lastAction === "like" ? (
+              <ThumbsUp className="size-16 opacity-80" aria-hidden="true" />
+            ) : (
+              <ThumbsDown className="size-16 opacity-80" aria-hidden="true" />
+            )}
           </div>
         )}
 
@@ -263,8 +269,10 @@ export default function SwipePage() {
 
         {/* ── Infos film central ── */}
 
+
+
         {/* ── Boutons Like / Dislike ── */}
-        <div className="flex justify-center flex-shrink-0 gap-[clamp(6rem,35rem+5vw,80rem)] px-4 pt-3 pb-6 bg-surface">
+        <div className="flex justify-center flex-shrink-0 gap-fluid-swipe-actions px-4 pt-3 pb-6">
           <SwipeActionButtons
             swipeState={
               lastAction === "like"
@@ -279,10 +287,8 @@ export default function SwipePage() {
             className=" scale-150"
             disabled={!currentMovie || loading}
           />
-
-          
         </div>
-                  <h2 className="text-text-primary text-md font-semibold self-auto text-center pb-24">
+          <h2 className="text-text-primary text-md font-semibold self-auto text-center pb-sm">
             Utilise ← / → ou J / L pour décider — clique une carte latérale pour naviguer
           </h2>
       </div>

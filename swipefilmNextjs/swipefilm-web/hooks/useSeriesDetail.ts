@@ -14,7 +14,7 @@ interface SeriesDetailData {
 // ✅ Contrairement à useMovieDetail, un seul appel suffit — GET /api/series/{id}
 // renvoie déjà cast/créateurs/certification/backdrop en direct depuis TMDB,
 // pas besoin d'un second appel de type /api/tmdb/tv/{id}.
-export function useSeriesDetail(seriesId: string): SeriesDetailData {
+export function useSeriesDetail(seriesId: string | null): SeriesDetailData {
   const user = useAppStore((s) => s.user);
   const [series, setSeries] = useState<Series | null>(null);
   const [loading, setLoading] = useState(true);

@@ -1,23 +1,19 @@
-﻿// swipefilm/Auth/SonarrService.cs
+// swipefilm/Auth/SonarrService.cs
 using System.Text.Json;
-using Microsoft.EntityFrameworkCore;
 using swipefilm.Models;
 
 namespace swipefilm.Auth
 {
     public class SonarrService
     {
-        private readonly AppDbContext _db;
-        private readonly IEncryptionService _encryption;
+        private readonly IAppConfigService _config;
         private readonly IHttpClientFactory _httpFactory;
 
         public SonarrService(
-            AppDbContext db,
-            IEncryptionService encryption,
+            IAppConfigService config,
             IHttpClientFactory httpFactory)
         {
-            _db = db;
-            _encryption = encryption;
+            _config = config;
             _httpFactory = httpFactory;
         }
 
@@ -35,35 +31,172 @@ namespace swipefilm.Auth
             catch { return false; }
         }
 
-        // ─── Credentials ──────────────────────────────────────────────
-        // Sonarr est une config globale d'instance (un seul admin la configure
-        // via [RequirePermission(Permission.Admin)]) — pas une config par
-        // utilisateur, donc pas de filtre UserId ici.
-
-        private async Task<UserSonarr?> GetActiveConfigAsync()
+        // ─── Webhook (Connect) ──────────────────────────────────────────
+        // ✅ Même principe que RadarrService.RegisterWebhookAsync — crée/met
+        // à jour automatiquement la connexion "Webhook" côté Sonarr. Best-
+        // effort : une erreur ici ne doit pas faire échouer la sauvegarde de
+        // la config Sonarr elle-même.
+        public async Task<(bool Success, string CallbackUrl, string? Error)> RegisterWebhookAsync(
+            string callbackBaseUrl)
         {
-            return await _db.UserSonarr
-                .Include(s => s.User)
-                .Where(s => s.IsActive && (s.User.Permissions & (long)Permission.Admin) != 0)
-                .FirstOrDefaultAsync();
+            var creds = GetCredentials();
+            if (creds is null) return (false, "", "Sonarr non configuré");
+            var (url, apiKey) = creds.Value;
+
+            // ✅ Même raisonnement que RadarrService : forcer http, Sonarr n'a
+            // aucune raison de faire confiance au certificat TLS de ce serveur.
+            if (callbackBaseUrl.StartsWith("https://", StringComparison.OrdinalIgnoreCase))
+                callbackBaseUrl = "http://" + callbackBaseUrl["https://".Length..];
+
+            var token = await _config.GetOrCreateSonarrWebhookTokenAsync();
+            var callbackUrl = $"{callbackBaseUrl.TrimEnd('/')}/api/webhooks/sonarr?token={token}";
+
+            try
+            {
+                var existingId = _config.GetSonarr()?.WebhookConnectionId;
+                var http = _httpFactory.CreateClient();
+
+                var (ok, error) = existingId is { } id
+                    ? await TryUpdateOrRecreateAsync(http, url, apiKey, id, callbackUrl)
+                    : await TryCreateAsync(http, url, apiKey, callbackUrl);
+
+                return (ok, callbackUrl, error);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[Sonarr] RegisterWebhookAsync erreur: {ex.Message}");
+                return (false, callbackUrl, ex.Message);
+            }
         }
 
-        private async Task<(string url, string apiKey)?> GetCredentialsAsync()
+        private Dictionary<string, object?> BuildWebhookPayload(string callbackUrl, int? existingId) => new()
         {
-            var sonarr = await GetActiveConfigAsync();
-            if (sonarr is null) return null;
+            ["id"] = existingId,
+            ["name"] = "SwipeFilm",
+            ["implementation"] = "Webhook",
+            ["implementationName"] = "Webhook",
+            ["configContract"] = "WebhookSettings",
+            ["onGrab"] = true,
+            ["onDownload"] = true,
+            ["onUpgrade"] = true,
+            ["onImportComplete"] = false,
+            ["onSeriesAdd"] = false,
+            ["onSeriesDelete"] = false,
+            ["onEpisodeFileDelete"] = false,
+            ["onEpisodeFileDeleteForUpgrade"] = false,
+            ["onHealthIssue"] = false,
+            ["onHealthRestored"] = false,
+            ["onApplicationUpdate"] = false,
+            ["onManualInteractionRequired"] = false,
+            ["includeHealthWarnings"] = false,
+            ["tags"] = Array.Empty<int>(),
+            ["fields"] = new object[]
+            {
+                new { name = "url", value = callbackUrl },
+                new { name = "method", value = 1 }, // 1 = POST
+                new { name = "username", value = "" },
+                new { name = "password", value = "" },
+            },
+        };
 
-            return (
-                _encryption.Decrypt(sonarr.UrlEncrypted),
-                _encryption.Decrypt(sonarr.ApiKeyEncrypted)
-            );
+        private async Task<(bool, string?)> TryCreateAsync(
+            HttpClient http, string url, string apiKey, string callbackUrl)
+        {
+            var payload = BuildWebhookPayload(callbackUrl, null);
+            payload.Remove("id");
+
+            var response = await http.PostAsJsonAsync($"{url}/api/v3/notification?apikey={apiKey}", payload);
+            if (!response.IsSuccessStatusCode)
+            {
+                var body = await response.Content.ReadAsStringAsync();
+                Console.WriteLine($"[Sonarr] Création webhook échouée ({(int)response.StatusCode}): {body}");
+                return (false, $"Sonarr a refusé la création ({(int)response.StatusCode})");
+            }
+
+            var json = await response.Content.ReadFromJsonAsync<JsonElement>();
+            if (json.TryGetProperty("id", out var idProp))
+                await _config.SetSonarrWebhookConnectionIdAsync(idProp.GetInt32());
+
+            return (true, null);
+        }
+
+        // ✅ Si l'id stocké a été supprimé côté Sonarr (ex: à la main dans
+        // Settings → Connect), le PUT échoue avec un 404 — on retombe alors
+        // sur une création plutôt que d'abandonner pour de bon.
+        private async Task<(bool, string?)> TryUpdateOrRecreateAsync(
+            HttpClient http, string url, string apiKey, int existingId, string callbackUrl)
+        {
+            var payload = BuildWebhookPayload(callbackUrl, existingId);
+            var response = await http.PutAsJsonAsync(
+                $"{url}/api/v3/notification/{existingId}?apikey={apiKey}", payload);
+
+            if (response.IsSuccessStatusCode) return (true, null);
+
+            if (response.StatusCode == System.Net.HttpStatusCode.NotFound)
+            {
+                Console.WriteLine(
+                    $"[Sonarr] Connexion webhook {existingId} introuvable (supprimée côté Sonarr ?) — recréation");
+                return await TryCreateAsync(http, url, apiKey, callbackUrl);
+            }
+
+            var body = await response.Content.ReadAsStringAsync();
+            Console.WriteLine($"[Sonarr] Mise à jour webhook échouée ({(int)response.StatusCode}): {body}");
+            return (false, $"Sonarr a refusé la mise à jour ({(int)response.StatusCode})");
+        }
+
+        // ─── Credentials ──────────────────────────────────────────────
+        // Sonarr est une config globale d'instance (config/settings.json,
+        // pas une table par utilisateur) — un seul Sonarr pour tout le foyer.
+
+        private (string url, string apiKey)? GetCredentials()
+        {
+            var sonarr = _config.GetSonarr();
+            if (sonarr is null) return null;
+            return (sonarr.Url, sonarr.ApiKey);
+        }
+
+        // ─── Profils qualité / dossiers racines ────────────────────────
+
+        public async Task<List<(int Id, string Name)>?> GetQualityProfilesAsync()
+        {
+            var creds = GetCredentials();
+            if (creds is null) return null;
+            var (url, apiKey) = creds.Value;
+
+            var http = _httpFactory.CreateClient();
+            var response = await http.GetAsync($"{url}/api/v3/qualityprofile?apikey={apiKey}");
+            if (!response.IsSuccessStatusCode) return null;
+
+            var json = await response.Content.ReadFromJsonAsync<JsonElement>();
+            return json.EnumerateArray()
+                .Select(p => (p.GetProperty("id").GetInt32(), p.GetProperty("name").GetString() ?? ""))
+                .ToList();
+        }
+
+        public async Task<List<(int Id, string Path, long FreeSpace, long TotalSpace)>?> GetRootFoldersAsync()
+        {
+            var creds = GetCredentials();
+            if (creds is null) return null;
+            var (url, apiKey) = creds.Value;
+
+            var http = _httpFactory.CreateClient();
+            var response = await http.GetAsync($"{url}/api/v3/rootfolder?apikey={apiKey}");
+            if (!response.IsSuccessStatusCode) return null;
+
+            var json = await response.Content.ReadFromJsonAsync<JsonElement>();
+            return json.EnumerateArray().Select(f => (
+                f.GetProperty("id").GetInt32(),
+                f.GetProperty("path").GetString() ?? "",
+                f.TryGetProperty("freeSpace", out var fs) ? fs.GetInt64() : 0,
+                f.TryGetProperty("totalSpace", out var ts) ? ts.GetInt64() : 0
+            )).ToList();
         }
 
         // ─── Statut d'une série ───────────────────────────────────────
 
         public async Task<SonarrSeriesStatus> GetSeriesStatusAsync(int tvdbId)
         {
-            var creds = await GetCredentialsAsync();
+            var creds = GetCredentials();
             if (creds is null)
                 return new SonarrSeriesStatus(false, false, "notConfigured", 0, 0, null);
 
@@ -186,11 +319,11 @@ namespace swipefilm.Auth
             int? qualityProfileIdOverride = null,
             string? rootFolderPathOverride = null)
         {
-            var sonarrConfig = await GetActiveConfigAsync();
+            var sonarrConfig = _config.GetSonarr();
             if (sonarrConfig is null) return (false, "Sonarr non configuré");
 
-            var url = _encryption.Decrypt(sonarrConfig.UrlEncrypted);
-            var apiKey = _encryption.Decrypt(sonarrConfig.ApiKeyEncrypted);
+            var url = sonarrConfig.Url;
+            var apiKey = sonarrConfig.ApiKey;
 
             try
             {
@@ -378,7 +511,7 @@ namespace swipefilm.Auth
         public async Task<(bool success, string message)> RemoveSeriesAsync(
             int tvdbId, bool deleteFiles = false)
         {
-            var creds = await GetCredentialsAsync();
+            var creds = GetCredentials();
             if (creds is null) return (false, "Sonarr non configuré");
 
             var (url, apiKey) = creds.Value;
@@ -411,7 +544,7 @@ namespace swipefilm.Auth
             List<int> tvdbIds)
         {
             var result = new Dictionary<int, SonarrSeriesStatus>();
-            var creds = await GetCredentialsAsync();
+            var creds = GetCredentials();
             if (creds is null) return result;
 
             var (url, apiKey) = creds.Value;

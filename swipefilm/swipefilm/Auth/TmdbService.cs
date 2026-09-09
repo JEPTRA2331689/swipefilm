@@ -571,6 +571,83 @@
                 );
             }
 
+            // ─── Populaires — fallback quand le moteur de reco n'a rien à
+            // proposer (catalogue vide/utilisateur neuf) et décor de fond des
+            // pages login/signup/onboarding (avant authentification, jamais
+            // de données sensibles ici — juste ce que TMDB expose déjà en public).
+
+            public async Task<List<TmdbPopularItemDto>> GetPopularMoviesAsync(int page)
+            {
+                var response = await _http.GetAsync(
+                    $"https://api.themoviedb.org/3/movie/popular" +
+                    $"?api_key={_apiKey}&language=fr-FR&page={page}");
+
+                if (!response.IsSuccessStatusCode) return [];
+
+                var json = await response.Content.ReadFromJsonAsync<JsonElement>();
+                if (!json.TryGetProperty("results", out var results)) return [];
+
+                return results.EnumerateArray()
+                    .Where(m => m.TryGetProperty("poster_path", out var pp) && pp.ValueKind != JsonValueKind.Null)
+                    .Take(18)
+                    .Select(m => new TmdbPopularItemDto(
+                        TmdbId: m.GetProperty("id").GetInt32(),
+                        Title: m.GetProperty("title").GetString() ?? "",
+                        PosterPath: m.GetProperty("poster_path").GetString(),
+                        BackdropPath: m.TryGetProperty("backdrop_path", out var bp) && bp.ValueKind != JsonValueKind.Null
+                            ? bp.GetString() : null,
+                        TmdbRating: m.TryGetProperty("vote_average", out var va) ? va.GetSingle() : 0f,
+                        ReleaseDate: m.TryGetProperty("release_date", out var rd)
+                            && DateOnly.TryParse(rd.GetString(), out var date) ? date : null
+                    ))
+                    .ToList();
+            }
+
+            // ─── Extra fiche film — cast avec photos + tagline, en plus de ce
+            // que GetMovieDetailsAsync renvoie déjà (pas de photos de cast ni
+            // de tagline là-bas) ───────────────────────────────────────────
+
+            public async Task<MovieExtraDto?> GetMovieExtraAsync(int tmdbId, string locale)
+            {
+                var response = await _http.GetAsync(
+                    $"https://api.themoviedb.org/3/movie/{tmdbId}" +
+                    $"?api_key={_apiKey}&language={locale}&append_to_response=credits");
+
+                if (!response.IsSuccessStatusCode) return null;
+
+                var json = await response.Content.ReadFromJsonAsync<JsonElement>();
+
+                var directors = json.TryGetProperty("credits", out var credits)
+                    && credits.TryGetProperty("crew", out var crew)
+                    ? crew.EnumerateArray()
+                        .Where(c => c.GetProperty("job").GetString() == "Director")
+                        .Select(c => c.GetProperty("name").GetString()!)
+                        .Take(3)
+                        .ToArray()
+                    : [];
+
+                var cast = credits.ValueKind == JsonValueKind.Object
+                    && credits.TryGetProperty("cast", out var castArr)
+                    ? castArr.EnumerateArray().Take(5)
+                        .Select(c => new MovieExtraCastDto(
+                            Name: c.GetProperty("name").GetString() ?? "",
+                            Character: c.TryGetProperty("character", out var ch) ? ch.GetString() ?? "" : "",
+                            ProfilePath: c.TryGetProperty("profile_path", out var pp) && pp.ValueKind != JsonValueKind.Null
+                                ? $"https://image.tmdb.org/t/p/w185{pp.GetString()}" : null
+                        ))
+                        .ToArray()
+                    : [];
+
+                return new MovieExtraDto(
+                    Directors: directors,
+                    Cast: cast,
+                    BackdropPath: json.TryGetProperty("backdrop_path", out var bp) && bp.ValueKind != JsonValueKind.Null
+                        ? $"https://image.tmdb.org/t/p/original{bp.GetString()}" : null,
+                    Tagline: json.TryGetProperty("tagline", out var tl) && tl.ValueKind != JsonValueKind.Null
+                        ? tl.GetString() : null
+                );
+            }
+
             // ─── Résoudre le TvdbId d'une série (requis par Sonarr) ───────
             // TMDB et TheTVDB sont deux espaces d'ID différents : Sonarr attend
             // un tvdbId, jamais un tmdbId.
@@ -742,6 +819,30 @@
             List<TmdbSearchItemDto> Results,
             int Page,
             int TotalPages
+        );
+
+        // ✅ Forme alignée sur le type `Movie` du frontend (types/index.ts) —
+        // pas le DTO complet, juste ce qu'un poster de fallback affiche.
+        public record TmdbPopularItemDto(
+            int TmdbId,
+            string Title,
+            string? PosterPath,
+            string? BackdropPath,
+            float TmdbRating,
+            DateOnly? ReleaseDate
+        );
+
+        public record MovieExtraCastDto(
+            string Name,
+            string Character,
+            string? ProfilePath
+        );
+
+        public record MovieExtraDto(
+            string[] Directors,
+            MovieExtraCastDto[] Cast,
+            string? BackdropPath,
+            string? Tagline
         );
     }
 }

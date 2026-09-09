@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import { motion, AnimatePresence, type PanInfo } from "framer-motion";
+import { Clapperboard } from "lucide-react";
 import type { Movie } from "@/types";
 import { MoviePoster } from "./MoviePoster";
 
@@ -145,7 +146,7 @@ export function SwipeFocusRail({
               onDragEnd={isCenter ? handleDragEnd : undefined}
               whileDrag={{ scale: 1.05, rotate: 5, cursor: "grabbing" }}
             >
-              <div className="bg-surface aspect-[2/3] w-[clamp(6rem,35rem+5vw,80rem)] overflow-hidden border-t border-white/15 shadow-2xl">
+              <div className="bg-surface aspect-[2/3] size-fluid-swipe-poster overflow-hidden border-t border-white/15 shadow-2xl">
                 {movie.posterPath ? (
                   <MoviePoster
                     movie={movies[idx]}
@@ -154,7 +155,7 @@ export function SwipeFocusRail({
                   />
                 ) : (
                   <div className="bg-surface-alt flex h-full w-full items-center justify-center">
-                    <i className="ph-thin ph-film-slate text-text-secondary/30 text-4xl" />
+                    <Clapperboard className="size-8 text-text-secondary/30" />
                   </div>
                 )}
                 <div className="pointer-events-none absolute inset-0 rounded-2xl bg-gradient-to-b from-white/8 to-transparent" />

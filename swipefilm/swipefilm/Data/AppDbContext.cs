@@ -8,10 +8,7 @@ public class AppDbContext : IdentityDbContext<User, IdentityRole<Guid>, Guid>
 {
     public AppDbContext(DbContextOptions<AppDbContext> options) : base(options) { }
 
-    public DbSet<ServerConfig> ServerConfig => Set<ServerConfig>();
     public DbSet<UserSeerr> UserSeerr => Set<UserSeerr>();
-    public DbSet<UserRadarr> UserRadarr => Set<UserRadarr>();
-    public DbSet<UserSonarr> UserSonarr => Set<UserSonarr>();
     public DbSet<Movie> Movies => Set<Movie>();
     public DbSet<WatchHistory> WatchHistory => Set<WatchHistory>();
     public DbSet<Swipe> Swipes => Set<Swipe>();
@@ -26,6 +23,7 @@ public class AppDbContext : IdentityDbContext<User, IdentityRole<Guid>, Guid>
     public DbSet<ServerMovie> ServerMovie => Set<ServerMovie>();
     public DbSet<DiscoveryCache> DiscoveryCaches => Set<DiscoveryCache>();
     public DbSet<AppSettings> AppSettings => Set<AppSettings>();
+    public DbSet<AuthSession> AuthSessions => Set<AuthSession>();
 
     // ─── Séries ─────────────────────────────────────────────────
     public DbSet<Series> Series => Set<Series>();

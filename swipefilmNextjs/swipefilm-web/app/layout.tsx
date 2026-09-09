@@ -1,7 +1,7 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import "./globals.css";
 
-import { AuthProvider } from "@/context/AuthContext";
+import { AuthProvider } from "@/features/auth/AuthContext";
 
 export const metadata: Metadata = {
   metadataBase: new URL("https://swipefilm.app"),
@@ -35,11 +35,6 @@ export const metadata: Metadata = {
     apple: "/apple-touch-icon.png",
   },
 
-  themeColor: [
-    { media: "(prefers-color-scheme: dark)", color: "#09090B" },
-    { media: "(prefers-color-scheme: light)", color: "#FFFFFF" },
-  ],
-
   openGraph: {
     title: "SwipeFilm",
     description:
@@ -54,6 +49,13 @@ export const metadata: Metadata = {
     title: "SwipeFilm",
     description: "Découvrez votre prochain film en quelques swipes.",
   },
+};
+
+export const viewport: Viewport = {
+  themeColor: [
+    { media: "(prefers-color-scheme: dark)", color: "#09090B" },
+    { media: "(prefers-color-scheme: light)", color: "#FFFFFF" },
+  ],
 };
 
 export default function RootLayout({
@@ -100,23 +102,8 @@ export default function RootLayout({
         />
 
         <link
-          href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600;700&family=DM+Sans:wght@400;500;700&display=swap"
+          href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap"
           rel="stylesheet"
-        />
-
-        <link
-          rel="stylesheet"
-          href="https://cdn.jsdelivr.net/npm/@phosphor-icons/web@2.1.1/src/thin/style.css"
-        />
-
-        <link
-          rel="stylesheet"
-          href="https://cdn.jsdelivr.net/npm/@phosphor-icons/web@2.1.1/src/fill/style.css"
-        />
-
-        <link
-          rel="stylesheet"
-          href="https://cdnjs.cloudflare.com/ajax/libs/tabler-icons/3.1.0/iconfont/tabler-icons.min.css"
         />
       </head>
 

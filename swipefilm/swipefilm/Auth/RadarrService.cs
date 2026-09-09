@@ -1,23 +1,19 @@
-﻿// swipefilm/Auth/RadarrService.cs
+// swipefilm/Auth/RadarrService.cs
 using System.Text.Json;
-using Microsoft.EntityFrameworkCore;
 using swipefilm.Models;
 
 namespace swipefilm.Auth
 {
     public class RadarrService
     {
-        private readonly AppDbContext _db;
-        private readonly IEncryptionService _encryption;
+        private readonly IAppConfigService _config;
         private readonly IHttpClientFactory _httpFactory;
 
         public RadarrService(
-            AppDbContext db,
-            IEncryptionService encryption,
+            IAppConfigService config,
             IHttpClientFactory httpFactory)
         {
-            _db = db;
-            _encryption = encryption;
+            _config = config;
             _httpFactory = httpFactory;
         }
 
@@ -35,35 +31,177 @@ namespace swipefilm.Auth
             catch { return false; }
         }
 
-        // ─── Credentials ──────────────────────────────────────────────
-        // Radarr est une config globale d'instance (un seul admin la configure
-        // via [RequirePermission(Permission.Admin)]) — pas une config par
-        // utilisateur, donc pas de filtre UserId ici.
-
-        private async Task<UserRadarr?> GetActiveConfigAsync()
+        // ─── Webhook (Connect) ──────────────────────────────────────────
+        // ✅ Crée/met à jour automatiquement la connexion "Webhook" côté
+        // Radarr (Settings → Connect) plutôt que de demander à l'admin de le
+        // faire à la main — RadarrWebhookController reçoit ensuite Grab/
+        // Download en temps réel. Best-effort : n'importe quelle erreur ici
+        // ne doit pas faire échouer la sauvegarde de la config Radarr
+        // elle-même, l'admin peut toujours l'ajouter manuellement en secours.
+        public async Task<(bool Success, string CallbackUrl, string? Error)> RegisterWebhookAsync(
+            string callbackBaseUrl)
         {
-            return await _db.UserRadarr
-                .Include(r => r.User)
-                .Where(r => r.IsActive && (r.User.Permissions & (long)Permission.Admin) != 0)
-                .FirstOrDefaultAsync();
+            var creds = GetCredentials();
+            if (creds is null) return (false, "", "Radarr non configuré");
+            var (url, apiKey) = creds.Value;
+
+            // ✅ Radarr n'a aucune raison de faire confiance au certificat TLS
+            // (souvent auto-signé) de ce serveur — on force http même si
+            // l'admin a configuré/parcouru en https, sinon Radarr échoue à
+            // établir la connexion pour envoyer ses notifications.
+            if (callbackBaseUrl.StartsWith("https://", StringComparison.OrdinalIgnoreCase))
+                callbackBaseUrl = "http://" + callbackBaseUrl["https://".Length..];
+
+            var token = await _config.GetOrCreateRadarrWebhookTokenAsync();
+            var callbackUrl = $"{callbackBaseUrl.TrimEnd('/')}/api/webhooks/radarr?token={token}";
+
+            try
+            {
+                var existingId = _config.GetRadarr()?.WebhookConnectionId;
+                var http = _httpFactory.CreateClient();
+
+                var (ok, error) = existingId is { } id
+                    ? await TryUpdateOrRecreateAsync(http, url, apiKey, id, callbackUrl)
+                    : await TryCreateAsync(http, url, apiKey, callbackUrl);
+
+                return (ok, callbackUrl, error);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[Radarr] RegisterWebhookAsync erreur: {ex.Message}");
+                return (false, callbackUrl, ex.Message);
+            }
         }
 
-        private async Task<(string url, string apiKey)?> GetCredentialsAsync()
+        private Dictionary<string, object?> BuildWebhookPayload(string callbackUrl, int? existingId) => new()
         {
-            var radarr = await GetActiveConfigAsync();
-            if (radarr is null) return null;
+            ["id"] = existingId,
+            ["name"] = "SwipeFilm",
+            ["implementation"] = "Webhook",
+            ["implementationName"] = "Webhook",
+            ["configContract"] = "WebhookSettings",
+            ["onGrab"] = true,
+            ["onDownload"] = true,
+            ["onUpgrade"] = true,
+            ["onMovieAdded"] = false,
+            ["onMovieDelete"] = false,
+            ["onMovieFileDelete"] = false,
+            ["onMovieFileDeleteForUpgrade"] = false,
+            ["onHealthIssue"] = false,
+            ["onHealthRestored"] = false,
+            ["onApplicationUpdate"] = false,
+            ["onManualInteractionRequired"] = false,
+            ["includeHealthWarnings"] = false,
+            ["tags"] = Array.Empty<int>(),
+            ["fields"] = new object[]
+            {
+                new { name = "url", value = callbackUrl },
+                new { name = "method", value = 1 }, // 1 = POST
+                new { name = "username", value = "" },
+                new { name = "password", value = "" },
+            },
+        };
 
-            return (
-                _encryption.Decrypt(radarr.UrlEncrypted),
-                _encryption.Decrypt(radarr.ApiKeyEncrypted)
-            );
+        private async Task<(bool, string?)> TryCreateAsync(
+            HttpClient http, string url, string apiKey, string callbackUrl)
+        {
+            var payload = BuildWebhookPayload(callbackUrl, null);
+            payload.Remove("id");
+
+            var response = await http.PostAsJsonAsync($"{url}/api/v3/notification?apikey={apiKey}", payload);
+            if (!response.IsSuccessStatusCode)
+            {
+                var body = await response.Content.ReadAsStringAsync();
+                Console.WriteLine($"[Radarr] Création webhook échouée ({(int)response.StatusCode}): {body}");
+                return (false, $"Radarr a refusé la création ({(int)response.StatusCode})");
+            }
+
+            var json = await response.Content.ReadFromJsonAsync<JsonElement>();
+            if (json.TryGetProperty("id", out var idProp))
+                await _config.SetRadarrWebhookConnectionIdAsync(idProp.GetInt32());
+
+            return (true, null);
+        }
+
+        // ✅ Si l'id stocké a été supprimé côté Radarr (ex: à la main dans
+        // Settings → Connect), le PUT échoue avec un 404 — on retombe alors
+        // sur une création plutôt que d'abandonner pour de bon.
+        private async Task<(bool, string?)> TryUpdateOrRecreateAsync(
+            HttpClient http, string url, string apiKey, int existingId, string callbackUrl)
+        {
+            var payload = BuildWebhookPayload(callbackUrl, existingId);
+            var response = await http.PutAsJsonAsync(
+                $"{url}/api/v3/notification/{existingId}?apikey={apiKey}", payload);
+
+            if (response.IsSuccessStatusCode) return (true, null);
+
+            if (response.StatusCode == System.Net.HttpStatusCode.NotFound)
+            {
+                Console.WriteLine(
+                    $"[Radarr] Connexion webhook {existingId} introuvable (supprimée côté Radarr ?) — recréation");
+                return await TryCreateAsync(http, url, apiKey, callbackUrl);
+            }
+
+            var body = await response.Content.ReadAsStringAsync();
+            Console.WriteLine($"[Radarr] Mise à jour webhook échouée ({(int)response.StatusCode}): {body}");
+            return (false, $"Radarr a refusé la mise à jour ({(int)response.StatusCode})");
+        }
+
+        // ─── Credentials ──────────────────────────────────────────────
+        // Radarr est une config globale d'instance (config/settings.json,
+        // pas une table par utilisateur) — un seul Radarr pour tout le foyer.
+
+        private (string url, string apiKey)? GetCredentials()
+        {
+            var radarr = _config.GetRadarr();
+            if (radarr is null) return null;
+            return (radarr.Url, radarr.ApiKey);
+        }
+
+        // ─── Profils qualité / dossiers racines ────────────────────────
+        // Consolidés ici (plutôt que dupliqués dans le controller) — un seul
+        // endroit qui sait résoudre les credentials Radarr.
+
+        public async Task<List<(int Id, string Name)>?> GetQualityProfilesAsync()
+        {
+            var creds = GetCredentials();
+            if (creds is null) return null;
+            var (url, apiKey) = creds.Value;
+
+            var http = _httpFactory.CreateClient();
+            var response = await http.GetAsync($"{url}/api/v3/qualityprofile?apikey={apiKey}");
+            if (!response.IsSuccessStatusCode) return null;
+
+            var json = await response.Content.ReadFromJsonAsync<JsonElement>();
+            return json.EnumerateArray()
+                .Select(p => (p.GetProperty("id").GetInt32(), p.GetProperty("name").GetString() ?? ""))
+                .ToList();
+        }
+
+        public async Task<List<(int Id, string Path, long FreeSpace, long TotalSpace)>?> GetRootFoldersAsync()
+        {
+            var creds = GetCredentials();
+            if (creds is null) return null;
+            var (url, apiKey) = creds.Value;
+
+            var http = _httpFactory.CreateClient();
+            var response = await http.GetAsync($"{url}/api/v3/rootfolder?apikey={apiKey}");
+            if (!response.IsSuccessStatusCode) return null;
+
+            var json = await response.Content.ReadFromJsonAsync<JsonElement>();
+            return json.EnumerateArray().Select(f => (
+                f.GetProperty("id").GetInt32(),
+                f.GetProperty("path").GetString() ?? "",
+                f.TryGetProperty("freeSpace", out var fs) ? fs.GetInt64() : 0,
+                f.TryGetProperty("totalSpace", out var ts) ? ts.GetInt64() : 0
+            )).ToList();
         }
 
         // ─── Statut d'un film ─────────────────────────────────────────
 
         public async Task<RadarrMovieStatus> GetMovieStatusAsync(int tmdbId)
         {
-            var creds = await GetCredentialsAsync();
+            var creds = GetCredentials();
             if (creds is null)
                 return new RadarrMovieStatus(false, false, "notConfigured", null, null);
 
@@ -176,11 +314,11 @@ namespace swipefilm.Auth
             int? qualityProfileIdOverride = null,
             string? rootFolderPathOverride = null)
         {
-            var radarrConfig = await GetActiveConfigAsync();
+            var radarrConfig = _config.GetRadarr();
             if (radarrConfig is null) return (false, "Radarr non configuré");
 
-            var url = _encryption.Decrypt(radarrConfig.UrlEncrypted);
-            var apiKey = _encryption.Decrypt(radarrConfig.ApiKeyEncrypted);
+            var url = radarrConfig.Url;
+            var apiKey = radarrConfig.ApiKey;
 
             try
             {
@@ -193,7 +331,7 @@ namespace swipefilm.Auth
                 {
                     qualityProfileId = qualityProfileIdOverride.Value;
                 }
-                else if (radarrConfig?.DefaultQualityProfileId is not null)
+                else if (radarrConfig.DefaultQualityProfileId is not null)
                 {
                     qualityProfileId = radarrConfig.DefaultQualityProfileId.Value;
                 }
@@ -212,7 +350,7 @@ namespace swipefilm.Auth
                 {
                     rootFolder = rootFolderPathOverride;
                 }
-                else if (radarrConfig?.DefaultRootFolderPath is not null)
+                else if (radarrConfig.DefaultRootFolderPath is not null)
                 {
                     rootFolder = radarrConfig.DefaultRootFolderPath;
                 }
@@ -255,7 +393,7 @@ namespace swipefilm.Auth
         public async Task<(bool success, string message)> RemoveMovieAsync(
             int tmdbId, bool deleteFiles = false)
         {
-            var creds = await GetCredentialsAsync();
+            var creds = GetCredentials();
             if (creds is null) return (false, "Radarr non configuré");
 
             var (url, apiKey) = creds.Value;
@@ -291,7 +429,7 @@ namespace swipefilm.Auth
             List<int> tmdbIds)
         {
             var result = new Dictionary<int, RadarrMovieStatus>();
-            var creds = await GetCredentialsAsync();
+            var creds = GetCredentials();
             if (creds is null) return result;
 
             var (url, apiKey) = creds.Value;

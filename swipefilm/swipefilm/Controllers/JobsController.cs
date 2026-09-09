@@ -79,5 +79,26 @@ namespace swipefilm.Controllers
                 trackUrl = $"/hangfire/jobs/details/{jobId}"
             });
         }
+
+        /// <summary>
+        /// État d'un job Hangfire par son id (celui renvoyé par /run ou par
+        /// n'importe quel BackgroundJob.Enqueue) — sert au frontend pour
+        /// attendre la fin d'un job (ex: sync post-onboarding) sans dépendre
+        /// du dashboard Hangfire.
+        /// </summary>
+        [HttpGet("status/{jobId}")]
+        public IActionResult GetJobStatus(string jobId)
+        {
+            var data = JobStorage.Current.GetConnection().GetJobData(jobId);
+            if (data is null)
+                return NotFound(new { error = "Job introuvable (jamais existé ou déjà expiré)" });
+
+            return Ok(new
+            {
+                jobId,
+                state = data.State, // Enqueued | Processing | Succeeded | Failed | Deleted | Scheduled
+                createdAt = data.CreatedAt,
+            });
+        }
     }
 }

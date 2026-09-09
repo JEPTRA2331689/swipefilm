@@ -13,7 +13,7 @@ interface SeriesSeasonsData {
 }
 
 // GET /api/series/{id}/seasons — disponibilité et statut de demande par saison.
-export function useSeriesSeasons(seriesId: string): SeriesSeasonsData {
+export function useSeriesSeasons(seriesId: string | null): SeriesSeasonsData {
   const user = useAppStore((s) => s.user);
   const [seasons, setSeasons] = useState<SeriesSeason[]>([]);
   const [loading, setLoading] = useState(true);

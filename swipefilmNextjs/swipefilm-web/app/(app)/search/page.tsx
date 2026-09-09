@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { Search, Film } from "lucide-react";
 import { TopNav } from "@/components/layout/TopNav";
 import { MoviePoster } from "@/components/movie/MoviePoster";
 import { api } from "@/lib/api";
@@ -85,8 +86,8 @@ export default function SearchPage() {
 
       <div className="mx-auto max-w-6xl px-4 pt-8 pb-16">
         <div className="relative mb-8">
-          <i
-            className="ph-thin ph-magnifying-glass text-text-secondary absolute top-1/2 left-4 -translate-y-1/2 text-lg"
+          <Search
+            className="size-5 text-text-secondary absolute top-1/2 left-4 -translate-y-1/2"
             aria-hidden
           />
           <input
@@ -107,14 +108,14 @@ export default function SearchPage() {
 
         {!loading && searched && results.length === 0 && (
           <div className="text-text-secondary flex flex-col items-center justify-center gap-2 py-16">
-            <i className="ph-thin ph-magnifying-glass text-4xl" aria-hidden />
+            <Search className="size-8" aria-hidden />
             <p className="text-sm">Aucun résultat pour « {query} ».</p>
           </div>
         )}
 
         {!loading && !searched && results.length === 0 && (
           <div className="text-text-secondary/60 flex flex-col items-center justify-center gap-2 py-16">
-            <i className="ph-thin ph-film-strip text-4xl" aria-hidden />
+            <Film className="size-8" aria-hidden />
             <p className="text-sm">
               Commence à taper pour chercher un film ou une série.
             </p>

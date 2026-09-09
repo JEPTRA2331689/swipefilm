@@ -1,10 +1,10 @@
-﻿using System.Text;
+﻿using System.Security.Claims;
 using Hangfire;
 using Hangfire.PostgreSql;
-using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Authentication;
+using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.IdentityModel.Tokens;
 using Npgsql;
 using Serilog;
 using Serilog.Formatting.Json;
@@ -15,9 +15,15 @@ using swipefilm.Data;
 // ✅ Charge .env (jamais commité) dans les variables d'environnement — les
 // clés/mots de passe sortent de appsettings.json. IConfiguration lit déjà
 // les variables d'environnement par défaut (format Section__Cle), donc rien
-// d'autre à câbler : ConnectionStrings__DefaultConnection, Jwt__Secret,
-// Encryption__Secret, Tmdb__ApiKey, Webhooks__RadarrToken/SonarrToken.
-DotNetEnv.Env.Load();
+// d'autre à câbler : ConnectionStrings__DefaultConnection,
+// Encryption__Secret, Tmdb__ApiKey. (Les tokens webhook Radarr/Sonarr ne
+// sont plus des secrets .env — générés et gérés par l'app elle-même,
+// voir AppConfigService.GetOrCreate{Radarr,Sonarr}WebhookTokenAsync.)
+// ✅ Optionnel — en Docker il n'y a pas de fichier .env dans l'image (les
+// secrets arrivent déjà comme vraies variables d'env via docker-compose),
+// Env.Load() planterait sinon en cherchant un fichier qui n'existe pas.
+if (File.Exists(".env"))
+    DotNetEnv.Env.Load();
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -72,36 +78,86 @@ builder.Services.AddIdentity<User, IdentityRole<Guid>>(options =>
 .AddEntityFrameworkStores<AppDbContext>()
 .AddDefaultTokenProviders();
 
-// ─── JWT ──────────────────────────────────────────────────────
+// ─── Auth par cookie de session ─────────────────────────────────
+// ✅ Même principe qu'Overseerr : le cookie ne contient qu'un id de session
+// opaque (claim "sid"), la table AuthSessions est la seule source de
+// vérité — révocable à tout moment (logout), contrairement à un JWT qui
+// reste valide jusqu'à expiration même après une "déconnexion" client-only.
+// Possible uniquement parce que frontend et backend sont désormais servis
+// depuis la même origine (voir Program.cs plus bas, UseStaticFiles) — pas
+// besoin de SameSite=None/cross-site.
 builder.Services.AddAuthentication(options =>
 {
-    options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
-    options.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;
+    options.DefaultAuthenticateScheme = CookieAuthenticationDefaults.AuthenticationScheme;
+    options.DefaultChallengeScheme = CookieAuthenticationDefaults.AuthenticationScheme;
 })
-.AddJwtBearer(options =>
+.AddCookie(options =>
 {
-    options.TokenValidationParameters = new TokenValidationParameters
-    {
-        ValidateIssuer = true,
-        ValidateAudience = true,
-        ValidateLifetime = true,
-        ValidateIssuerSigningKey = true,
-        ValidIssuer = builder.Configuration["Jwt:Issuer"],
-        ValidAudience = builder.Configuration["Jwt:Audience"],
-        IssuerSigningKey = new SymmetricSecurityKey(
-            Encoding.UTF8.GetBytes(builder.Configuration["Jwt:Secret"]!))
-    };
+    options.Cookie.Name = "swipefilm_session";
+    options.Cookie.HttpOnly = true;
+    options.Cookie.SameSite = SameSiteMode.Lax;
+    options.Cookie.SecurePolicy = CookieSecurePolicy.SameAsRequest;
+    options.ExpireTimeSpan = TimeSpan.FromDays(30);
+    options.SlidingExpiration = true;
 
-    options.Events = new JwtBearerEvents
+    options.Events = new CookieAuthenticationEvents
     {
-        OnMessageReceived = context =>
+        // ✅ Vérifie la session à chaque requête contre la base (un logout ou
+        // une session supprimée prend effet immédiatement, pas seulement à
+        // l'expiration du cookie) ET reconstruit les claims depuis l'utilisateur
+        // actuel — permissions toujours à jour, contrairement au JWT qui
+        // restait valide jusqu'à 7 jours même après un changement de rôle.
+        OnValidatePrincipal = async context =>
         {
-            var token = context.Request.Query["access_token"];
-            var path = context.HttpContext.Request.Path;
-            if (!string.IsNullOrEmpty(token) && path.StartsWithSegments("/hubs"))
-                context.Token = token;
+            var sid = context.Principal?.FindFirstValue("sid");
+            if (sid is null || !Guid.TryParse(sid, out var sessionId))
+            {
+                context.RejectPrincipal();
+                return;
+            }
+
+            var db = context.HttpContext.RequestServices.GetRequiredService<AppDbContext>();
+            var session = await db.AuthSessions.FindAsync(sessionId);
+            if (session is null || session.ExpiresAt < DateTime.UtcNow)
+            {
+                context.RejectPrincipal();
+                await context.HttpContext.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
+                return;
+            }
+
+            var user = await db.Users.FindAsync(session.UserId);
+            if (user is null)
+            {
+                context.RejectPrincipal();
+                await context.HttpContext.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
+                return;
+            }
+
+            var claims = new[]
+            {
+                new Claim(ClaimTypes.NameIdentifier, user.Id.ToString()),
+                new Claim(ClaimTypes.Email, user.Email!),
+                new Claim(ClaimTypes.Name, user.DisplayName),
+                new Claim("permissions", user.Permissions.ToString()),
+                new Claim("isAdmin", user.IsAdmin.ToString().ToLower()),
+                new Claim("sid", sid),
+            };
+            var identity = new ClaimsIdentity(claims, CookieAuthenticationDefaults.AuthenticationScheme);
+            context.ReplacePrincipal(new ClaimsPrincipal(identity));
+        },
+        // ✅ API JSON — jamais de redirection HTML vers une page de login
+        // (comportement par défaut du handler cookie, pensé pour Razor),
+        // juste un code de statut comme avec le Bearer JWT avant.
+        OnRedirectToLogin = context =>
+        {
+            context.Response.StatusCode = StatusCodes.Status401Unauthorized;
             return Task.CompletedTask;
-        }
+        },
+        OnRedirectToAccessDenied = context =>
+        {
+            context.Response.StatusCode = StatusCodes.Status403Forbidden;
+            return Task.CompletedTask;
+        },
     };
 });
 
@@ -125,27 +181,12 @@ builder.Services.AddHangfireServer(options =>
 
 // ─── Swagger ──────────────────────────────────────────────────
 builder.Services.AddEndpointsApiExplorer();
+// ✅ Auth par cookie de session — Swagger UI envoie déjà le cookie du
+// navigateur automatiquement (même origine), pas de schéma Bearer à
+// déclarer ici comme avant avec le JWT.
 builder.Services.AddSwaggerGen(c =>
 {
     c.SwaggerDoc("v1", new() { Title = "SwipeFilm API", Version = "v1" });
-    c.AddSecurityDefinition("Bearer", new()
-    {
-        Name = "Authorization",
-        Type = Microsoft.OpenApi.Models.SecuritySchemeType.Http,
-        Scheme = "Bearer",
-        BearerFormat = "JWT",
-        In = Microsoft.OpenApi.Models.ParameterLocation.Header,
-        Description = "Entre ton token JWT ici"
-    });
-    c.AddSecurityRequirement(new()
-    {
-        {
-            new() { Reference = new() {
-                Type = Microsoft.OpenApi.Models.ReferenceType.SecurityScheme,
-                Id   = "Bearer" } },
-            []
-        }
-    });
 });
 
 // ─── Controllers + SignalR ────────────────────────────────────
@@ -155,12 +196,15 @@ builder.Services.AddSignalR();
 // ─── Services ─────────────────────────────────────────────────
 builder.Services.AddScoped<AuthManager>();
 builder.Services.AddScoped<IEncryptionService, EncryptionService>();
-builder.Services.AddScoped<IServerConfigService, ServerConfigService>();
+// ✅ Singleton — charge config/settings.json une seule fois en mémoire au
+// démarrage, pas à chaque requête (contrairement aux services Scoped).
+builder.Services.AddSingleton<IAppConfigService, AppConfigService>();
 builder.Services.AddScoped<JellyfinService>();
 builder.Services.AddScoped<PlexService>();
 builder.Services.AddScoped<SyncService>();
 builder.Services.AddScoped<TmdbService>();
 builder.Services.AddScoped<RecommendationEngine>();
+builder.Services.AddScoped<SessionService>();
 builder.Services.AddScoped<PersonalizedDiscoveryService>();
 builder.Services.AddScoped<SyncBackgroundJobService>();
 builder.Services.AddScoped<RadarrService>();
@@ -208,12 +252,9 @@ if (app.Environment.IsDevelopment())
     app.UseSwaggerUI();
 }
 
-// ✅ Exclu /api/webhooks/* — Radarr/Sonarr n'ont pas forcément un certificat
-// HTTPS de confiance vers ce serveur, la redirection les renverrait droit
-// dans le même mur SSL. Le token en query string reste la sécurité de ces routes.
-app.UseWhen(
-    context => !context.Request.Path.StartsWithSegments("/api/webhooks"),
-    branch => branch.UseHttpsRedirection());
+// ✅ Pas de UseHttpsRedirection — comme Radarr/Sonarr/Overseerr, cette appli
+// ne termine pas TLS elle-même (http seul, en dev comme en Docker). Pour du
+// HTTPS, mettre un reverse proxy (Nginx/Caddy/Traefik) devant avec un vrai certificat.
 app.UseCors("AllowAll"); // ← ajoute ici
 app.UseAuthentication(); // ← doit être avant UseAuthorization
 app.UseAuthorization();
@@ -253,7 +294,45 @@ RecurringJob.AddOrUpdate<SyncBackgroundJobService>(
     "*/30 * * * *",
     new RecurringJobOptions { QueueName = "default" });
 
+// ─── Frontend statique (export Next.js) ────────────────────────
+// ✅ Même pattern que Radarr/Sonarr : le backend sert directement les
+// fichiers du frontend (wwwroot, peuplé au build Docker depuis out/ —
+// voir Dockerfile) — pas de serveur Node séparé en prod.
+app.UseDefaultFiles();
+app.UseStaticFiles();
+
 // ─── Routes ───────────────────────────────────────────────────
 app.MapControllers();
+app.MapHub<swipefilm.Hubs.SessionHub>("/hubs/session");
+
+// ✅ Tout ce qui ne matche ni un contrôleur ni un fichier statique existant
+// est une route du frontend (SPA côté client une fois le JS chargé) — sert
+// le fichier .html correspondant. /movie/* et /series/* partagent un seul
+// shell ("_") : generateStaticParams côté Next n'en génère qu'un, le vrai
+// id est lu dans l'URL par useParams() au chargement, pas au build.
+app.MapFallback(async context =>
+{
+    var webRoot = app.Environment.WebRootPath;
+    var path = context.Request.Path.Value ?? "/";
+
+    string file;
+    if (path.StartsWith("/movie", StringComparison.OrdinalIgnoreCase))
+        file = "movie/_.html";
+    else if (path.StartsWith("/series", StringComparison.OrdinalIgnoreCase))
+        file = "series/_.html";
+    else if (path.StartsWith("/session", StringComparison.OrdinalIgnoreCase))
+        file = "session/_.html";
+    else if (path.StartsWith("/join", StringComparison.OrdinalIgnoreCase))
+        file = "join/_.html";
+    else
+    {
+        var trimmed = path.Trim('/');
+        var candidate = string.IsNullOrEmpty(trimmed) ? "index.html" : $"{trimmed}.html";
+        file = File.Exists(Path.Combine(webRoot, candidate)) ? candidate : "index.html";
+    }
+
+    context.Response.ContentType = "text/html";
+    await context.Response.SendFileAsync(Path.Combine(webRoot, file));
+});
 
 app.Run();

@@ -88,6 +88,29 @@ namespace swipefilm.Auth
             }
 
             _db.MediaRequests.Add(request);
+
+            // ✅ "Ma liste" (WatchlistController) se base uniquement sur les
+            // swipes à droite solo — une requête doit donc y apparaître aussi,
+            // sans dépendre d'un swipe préalable. Pas de doublon si l'un des
+            // deux existe déjà (ex: déjà swipé, puis requêté ensuite).
+            var alreadyOnList = await _db.Swipes.AnyAsync(s =>
+                s.UserId == userId && s.SessionId == null
+                && s.Direction == SwipeDirection.Right
+                && (movieId.HasValue ? s.MovieId == movieId : s.SeriesId == seriesId));
+
+            if (!alreadyOnList)
+                _db.Swipes.Add(new Swipe
+                {
+                    Id = Guid.NewGuid(),
+                    UserId = userId,
+                    MovieId = movieId,
+                    SeriesId = seriesId,
+                    Direction = SwipeDirection.Right,
+                    DurationMs = 0,
+                    ContextMode = SwipeContext.Solo,
+                    CreatedAt = DateTime.UtcNow,
+                });
+
             await _db.SaveChangesAsync();
 
             // ✅ Si AutoApprove → envoie directement à Radarr/Sonarr

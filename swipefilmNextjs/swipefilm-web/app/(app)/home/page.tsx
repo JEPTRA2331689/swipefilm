@@ -5,9 +5,11 @@ import { useInView } from "react-intersection-observer";
 import { TopNav } from "@/components/layout/TopNav";
 import { SectionRow, SectionRowSkeleton } from "@/components/movie/SectionRow";
 import { AutoCarousel } from "@/components/movie/HeaderCarrousel";
+import { GenreCarousel } from "@/features/catalog/components/GenreCarousel";
+import { CreateSessionButton } from "@/features/session/components/CreateSessionButton";
 import { useHomeSections } from "@/hooks/useHomeSections";
 import { useAppStore } from "@/lib/store";
-import { cn } from "@/lib/utils";
+import { cn, interleave } from "@/lib/utils";
 import { Button } from "@/components/ui/Button";
 import type { AvailabilityFilter, ContentTypeFilter } from "@/types";
 
@@ -37,12 +39,22 @@ export default function HomePage() {
     if (inView && hasMore && !loadingMore) loadMore();
   }, [inView, hasMore, loadingMore, loadMore]);
 
+  // ✅ "for_you" (films) et "for_you_series" ont le même poids (100, le plus
+  // haut) donc sont toujours générées toutes les deux en page 1 — mais
+  // "Récemment disponible" s'insère avant elles sans condition, donc on ne
+  // peut pas se fier à sections[0]. On les cherche par id et on les
+  // entrelace pour un carrousel mixte films+séries.
+  const forYouMovies = sections.find((s) => s.id === "for_you")?.movies ?? [];
+  const forYouSeries =
+    sections.find((s) => s.id === "for_you_series")?.movies ?? [];
+  const forYouMix = interleave(forYouMovies, forYouSeries);
+
   return (
     <div className="min-h-screen">
       <TopNav />
 
       <div className="px-4 pt-10 pb-4 md:px-12">
-        <AutoCarousel movies={sections[0]?.movies ?? []} />
+        <AutoCarousel movies={forYouMix} />
 
         <div className="mt-5 flex flex-wrap gap-3">
           {/* Filtre disponibilité */}
@@ -84,8 +96,14 @@ export default function HomePage() {
               </Button>
             ))}
           </div>
+
+          <div className="ml-auto">
+            <CreateSessionButton />
+          </div>
         </div>
       </div>
+
+      <GenreCarousel availability={availability} />
 
       {error && (
         <p className="text-error px-4 py-8 text-center text-sm md:px-12">
@@ -98,7 +116,11 @@ export default function HomePage() {
 
       {!loading &&
         sections.map((section) => (
-          <SectionRow key={section.id} section={section} />
+          <SectionRow
+            key={section.id}
+            section={section}
+            availability={availability}
+          />
         ))}
 
       {!loading && !error && sections.length === 0 && !hasMore && (

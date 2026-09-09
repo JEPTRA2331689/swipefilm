@@ -5,6 +5,7 @@ import useEmblaCarousel from "embla-carousel-react";
 import Autoplay from "embla-carousel-autoplay";
 import Image from "next/image";
 import Link from "next/link";
+import { VolumeX, Volume2 } from "lucide-react";
 import { api } from "@/lib/api";
 import type { Movie } from "@/types";
 import { releaseYear, tmdbImage, cn } from "@/lib/utils";
@@ -296,7 +297,7 @@ export function AutoCarousel({
                         <p className="font-display text-text-primary line-clamp-1 text-lg font-semibold drop-shadow md:text-xl lg:text-4xl xl:text-6xl">
                           {movie.title}
                         </p>
-                        <p className="font-display text-text-primary text-sm drop-shadow md:line-clamp-3 lg:line-clamp-3 lg:w-1/2 xl:line-clamp-10">
+                        <p className="font-body text-text-primary text-sm drop-shadow md:line-clamp-3 lg:line-clamp-3 lg:w-1/2 xl:line-clamp-10">
                           {movie.overview}
                         </p>
 
@@ -310,7 +311,7 @@ export function AutoCarousel({
                             </span>
                           ))}
                           {releaseYear(movie.releaseDate) && (
-                            <span className="text-text-primary border-accent sm:py-0.5, rounded-full border-2 font-medium backdrop-blur-sm sm:px-1.5 sm:text-[9px] md:px-2 md:py-1 md:text-[10px] lg:px-3 lg:py-1.5 lg:text-sm">
+                            <span className="font-body text-text-primary border-accent sm:py-0.5, rounded-full border-2 font-medium backdrop-blur-sm sm:px-1.5 sm:text-[9px] md:px-2 md:py-1 md:text-[10px] lg:px-3 lg:py-1.5 lg:text-sm">
                               {releaseYear(movie.releaseDate)}
                             </span>
                           )}
@@ -327,13 +328,13 @@ export function AutoCarousel({
                         )}
                       >
                         <div className="absolute top-2 left-2">
-                          <AvailabilityDot isAvailable={movie.isAvailable} />
+                          <AvailabilityDot isAvailable={movie.isAvailable} className="h-3 w-3" />
                         </div>
                       </div>
 
                       <span
                         className={cn(
-                          "text-text-primary drop-shadow",
+                          "font-display text-text-primary drop-shadow",
                           "text-2xl font-bold",
                         )}
                       >
@@ -365,14 +366,11 @@ export function AutoCarousel({
                             trailerMuted ? "Activer le son" : "Couper le son"
                           }
                         >
-                          <i
-                            className={cn(
-                              "ph-thin text-base",
-                              trailerMuted
-                                ? "ph-speaker-simple-slash"
-                                : "ph-speaker-simple-high",
-                            )}
-                          />
+                          {trailerMuted ? (
+                            <VolumeX className="size-4" />
+                          ) : (
+                            <Volume2 className="size-4" />
+                          )}
                         </IconButton>
                       )}
                     </div>

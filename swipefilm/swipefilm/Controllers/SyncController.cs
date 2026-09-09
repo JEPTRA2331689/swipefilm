@@ -14,20 +14,20 @@ namespace swipefilm.Controllers
     [Authorize]
     public class SyncController : ControllerBase
     {
-        private readonly AppDbContext _db;
+        private readonly IAppConfigService _config;
         private readonly JellyfinService _jellyfin;
         private readonly PlexService _plex;
         private readonly ILogger<SyncController> _logger;  // ← type générique
         private readonly IServiceProvider _serviceProvider;
 
         public SyncController(
-            AppDbContext db,
+            IAppConfigService config,
             JellyfinService jellyfin,
             PlexService plex,
             ILogger<SyncController> logger,  // ← type générique
             IServiceProvider serviceProvider)
         {
-            _db = db;
+            _config = config;
             _jellyfin = jellyfin;
             _plex = plex;
             _logger = logger;
@@ -41,7 +41,7 @@ namespace swipefilm.Controllers
         [HttpPost]
         public async Task<IActionResult> SyncServer()
         {
-            var server = await _db.ServerConfig.FirstOrDefaultAsync();
+            var server = _config.GetServer();
             if (server is null) return NotFound();
 
             // ✅ Queue "critical" pour les syncs manuelles

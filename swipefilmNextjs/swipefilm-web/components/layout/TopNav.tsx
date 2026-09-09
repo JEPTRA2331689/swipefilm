@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { Settings, User } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const navItems = [
@@ -19,7 +20,7 @@ export function TopNav() {
       <div className="flex items-center justify-between gap-6 px-4 py-4 md:px-12">
         <Link href="/home" className="flex items-baseline gap-2">
           <span className="font-display text-text-primary text-xl font-bold tracking-tight">
-            Swipe<span className="text-accent">Film</span>
+            Swipe<span className="text-accent">Film3</span>
           </span>
         </Link>
 
@@ -49,13 +50,13 @@ export function TopNav() {
             className="bg-surface-alt border-border text-text-secondary hover:text-text-primary flex h-9 w-9 items-center justify-center rounded-full border text-sm font-medium transition-colors"
             title="Paramètres"
           >
-            <i className="ph-thin ph-gear text-base" aria-hidden="true" />
+            <Settings className="size-4" aria-hidden="true" />
           </Link>
           <Link
             href="/profile"
             className="bg-surface-alt border-border text-text-secondary hover:text-text-primary flex h-9 w-9 items-center justify-center rounded-full border text-sm font-medium transition-colors"
           >
-            <i className="ti ti-user" aria-hidden="true" />
+            <User className="size-4" aria-hidden="true" />
           </Link>
         </div>
       </div>

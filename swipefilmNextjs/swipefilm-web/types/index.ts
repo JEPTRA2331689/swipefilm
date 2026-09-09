@@ -100,6 +100,7 @@ export interface User {
   id: string;
   email: string;
   name: string;
+  permissions: number;
   // ✅ Un seul serveur pour toute l'instance — plus une liste par
   // utilisateur (voir AuthController.Me)
   server?: UserServer | null;
@@ -115,11 +116,10 @@ export interface ArrConfig {
   apiKey: string;
 }
 
-// ✅ Singleton — un seul serveur pour toute l'instance (voir GET /api/servers)
+// ✅ Singleton — un seul serveur pour toute l'instance (voir GET /api/servers).
+// Vit dans config/settings.json côté backend (pas en base) — pas d'id/createdAt.
 export interface UserServer {
-  id: string;
   friendlyName?: string;
   type: "plex" | "jellyfin" | 0 | 1;
   lastSyncAt?: string;
-  createdAt?: string;
 }

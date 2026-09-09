@@ -2,6 +2,7 @@
 using System.Text.Json;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using swipefilm.Auth;
 using swipefilm.Data;
 using swipefilm.Models;
 
@@ -18,22 +19,30 @@ namespace swipefilm.Controllers
     public class RadarrWebhookController : ControllerBase
     {
         private readonly AppDbContext _db;
-        private readonly IConfiguration _config;
+        private readonly IAppConfigService _config;
         private readonly ILogger<RadarrWebhookController> _logger;
 
         public RadarrWebhookController(
-            AppDbContext db, IConfiguration config, ILogger<RadarrWebhookController> logger)
+            AppDbContext db, IAppConfigService config, ILogger<RadarrWebhookController> logger)
         {
             _db = db;
             _config = config;
             _logger = logger;
         }
 
+        // ✅ Sans ça, un GET (ex: coller l'URL dans un navigateur pour tester)
+        // ne matche aucune méthode sur cette route et retombe sur le
+        // MapFallback du frontend — on atterrit sur la page web au lieu d'un
+        // message clair. N'affecte pas Radarr, qui n'envoie que du POST.
+        [HttpGet]
+        public IActionResult Ping() =>
+            Ok(new { message = "Endpoint webhook Radarr — attend un POST de Radarr, pas une visite navigateur." });
+
         [HttpPost]
         public async Task<IActionResult> Receive(
             [FromQuery] string? token, [FromBody] JsonElement body)
         {
-            var expected = _config["Webhooks:RadarrToken"];
+            var expected = _config.GetRadarr()?.WebhookToken;
             if (string.IsNullOrEmpty(expected) || token != expected)
                 return Unauthorized();
 

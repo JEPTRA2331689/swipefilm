@@ -3,9 +3,8 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAppStore } from "@/lib/store";
-import { fetchMe, normalizeServer, checkSetupStatus } from "@/lib/auth";
-import { getTokenFromCookie } from "@/lib/jwt";
-import type { UserServer } from "@/types";
+import { fetchMe, checkSetupStatus } from "@/features/auth/api";
+import { normalizeServer } from "@/features/media-server/api";
 
 export default function RootPage() {
   const router = useRouter();
@@ -16,7 +15,7 @@ export default function RootPage() {
     async function check() {
       try {
         const status = await checkSetupStatus();
-        if (!status.isComplete) {
+        if (!status.isSetupComplete) {
           router.replace("/onboarding");
           return;
         }
@@ -24,23 +23,12 @@ export default function RootPage() {
         // Si l'endpoint échoue, on assume que le setup est fait
       }
 
-      const token = getTokenFromCookie();
-      if (!token) {
-        router.replace("/login");
-        return;
-      }
-
+      // ✅ Cookie de session HttpOnly — pas de présence à vérifier côté
+      // client, fetchMe() échoue (401) si non connecté.
       try {
         const me = await fetchMe();
-
-        setUser({
-          id: me.id,
-          username: me.username,
-          name: (me as { displayName?: string }).displayName ?? me.username,
-        });
-
-        const raw = (me as { server?: UserServer | null }).server ?? null;
-        setServer(raw ? normalizeServer(raw) : null);
+        setUser(me);
+        setServer(me.server ? normalizeServer(me.server) : null);
 
         router.replace("/home");
       } catch {

@@ -1,4 +1,4 @@
-import { usePermission } from "@/hooks/usePermission";
+import { usePermission } from "@/features/auth/usePermission";
 import { Permission } from "@/lib/permissions";
 
 interface PermissionGuardProps {

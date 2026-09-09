@@ -1,5 +1,8 @@
 ﻿// swipefilm/Controllers/AuthController.cs
+using System.Security.Claims;
 using System.Text.Json;
+using Microsoft.AspNetCore.Authentication;
+using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
@@ -17,20 +20,20 @@ namespace swipefilm.Controllers
         private readonly SignInManager<User> _signInManager;
         private readonly AuthManager _authManager;
         private readonly AppDbContext _db;
-        private readonly IServerConfigService _serverService;
+        private readonly IAppConfigService _config;
 
         public AuthController(
             UserManager<User> userManager,
             SignInManager<User> signInManager,
             AuthManager authManager,
             AppDbContext db,
-            IServerConfigService serverService)
+            IAppConfigService config)
         {
             _userManager = userManager;
             _signInManager = signInManager;
             _authManager = authManager;
             _db = db;
-            _serverService = serverService;
+            _config = config;
         }
 
         [HttpPost("register")]
@@ -48,8 +51,8 @@ namespace swipefilm.Controllers
             if (!result.Succeeded)
                 return BadRequest(result.Errors);
 
-            var token = _authManager.GenerateToken(user);
-            return Ok(new { token });
+            await _authManager.SignInAsync(HttpContext, user);
+            return Ok(BuildMeDto(user));
         }
 
         [HttpPost("login")]
@@ -57,9 +60,8 @@ namespace swipefilm.Controllers
         {
             Console.WriteLine(dto);
             // ✅ Le serveur Jellyfin de l'instance — un seul, partagé par tous
-            var anyServer = await _db.ServerConfig
-                .Where(s => s.Type == ServerType.Jellyfin)
-                .FirstOrDefaultAsync();
+            var anyServer = _config.GetServer() is { } s && s.Type == ServerType.Jellyfin
+                ? s : null;
 
             if (anyServer is not null)
             {
@@ -74,14 +76,20 @@ namespace swipefilm.Controllers
                         .FirstOrDefaultAsync(u => u.JellyfinUserId == jellyfinUserId);
 
                     if (jellyfinUser is not null)
-                        return Ok(new { token = _authManager.GenerateToken(jellyfinUser) });
+                    {
+                        await _authManager.SignInAsync(HttpContext, jellyfinUser);
+                        return Ok(BuildMeDto(jellyfinUser));
+                    }
 
                     // ✅ Auto-import si l'user Jellyfin n'est pas encore dans SwipeFilm
                     // (cas où un nouvel user Jellyfin rejoint après le setup)
                     var newUser = await AutoImportJellyfinUserAsync(
                         anyServer, jellyfinUserId, dto.Username);
                     if (newUser is not null)
-                        return Ok(new { token = _authManager.GenerateToken(newUser) });
+                    {
+                        await _authManager.SignInAsync(HttpContext, newUser);
+                        return Ok(BuildMeDto(newUser));
+                    }
                 }
             }
 
@@ -96,7 +104,52 @@ namespace swipefilm.Controllers
             if (!result.Succeeded)
                 return Unauthorized("Email ou mot de passe incorrect");
 
-            return Ok(new { token = _authManager.GenerateToken(user) });
+            await _authManager.SignInAsync(HttpContext, user);
+            return Ok(BuildMeDto(user));
+        }
+
+        [HttpPost("logout")]
+        [Authorize]
+        public async Task<IActionResult> Logout()
+        {
+            var sid = User.FindFirstValue("sid");
+            if (sid is not null && Guid.TryParse(sid, out var sessionId))
+            {
+                var session = await _db.AuthSessions.FindAsync(sessionId);
+                if (session is not null)
+                {
+                    _db.AuthSessions.Remove(session);
+                    await _db.SaveChangesAsync();
+                }
+            }
+
+            await HttpContext.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
+            return Ok();
+        }
+
+        // ✅ Même forme que GET /me — réutilisée pour que register/login
+        // renvoient directement l'utilisateur sans aller-retour supplémentaire
+        // côté front.
+        private object BuildMeDto(User user)
+        {
+            var config = _config.GetServer();
+            var server = config is null ? null : new
+            {
+                config.FriendlyName,
+                config.Type,
+                config.LastSyncAt,
+            };
+
+            return new
+            {
+                user.Id,
+                user.Email,
+                user.DisplayName,
+                user.AvatarUrl,
+                user.CreatedAt,
+                user.Permissions,
+                Server = server,
+            };
         }
 
         private async Task<bool> ValidateJellyfinCredentialsAsync(
@@ -119,11 +172,11 @@ namespace swipefilm.Controllers
             catch { return false; }
         }
         private async Task<(string? jellyfinUserId, bool success)> TryLoginJellyfinAsync(
-    ServerConfig server, string username, string password)
+    ServerSettings server, string username, string password)
         {
             try
             {
-                var (url, _) = await _serverService.GetDecryptedCredentialsAsync();
+                var (url, _) = _config.GetServerCredentials();
                 using var http = new HttpClient();
                 http.DefaultRequestHeaders.Add(
                     "X-Emby-Authorization",
@@ -153,11 +206,11 @@ namespace swipefilm.Controllers
             }
         }
         private async Task<User?> AutoImportJellyfinUserAsync(
-    ServerConfig server, string jellyfinUserId, string username)
+    ServerSettings server, string jellyfinUserId, string username)
         {
             try
             {
-                var (url, apiKey) = await _serverService.GetDecryptedCredentialsAsync();
+                var (url, apiKey) = _config.GetServerCredentials();
                 using var http = new HttpClient();
 
                 // Récupère les détails du user depuis l'API admin Jellyfin
@@ -252,20 +305,7 @@ namespace swipefilm.Controllers
             var user = await _userManager.GetUserAsync(User);
             if (user is null) return Unauthorized();
 
-            // ✅ Un seul serveur pour toute l'instance — plus une liste par user
-            var server = await _db.ServerConfig
-                .Select(s => new { s.Id, s.FriendlyName, s.Type, s.LastSyncAt, s.CreatedAt })
-                .FirstOrDefaultAsync();
-
-            return Ok(new
-            {
-                user.Id,
-                user.Email,
-                user.DisplayName,
-                user.AvatarUrl,
-                user.CreatedAt,
-                Server = server
-            });
+            return Ok(BuildMeDto(user));
         }
     }
 

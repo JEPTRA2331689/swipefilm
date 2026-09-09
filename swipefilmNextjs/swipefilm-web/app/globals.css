@@ -1,21 +1,21 @@
 @import "tailwindcss";
 
 :root {
-  --font-display: "Playfair Display", serif;
-  --font-body: "DM Sans", sans-serif;
+  --font-display: "Bebas Neue", sans-serif;
+  --font-body: "Plus Jakarta Sans", sans-serif;
 
   /* =========================
      COLORS - DARK THEME
      ========================= */
 
-  /* Background */
-  --color-bg-primary: #09090b;
-  --color-bg-secondary: #111113;
+  /* Background — bleu nuit uni plutôt que le noir neutre générique */
+  --color-bg-primary: #0a0e1a;
+  --color-bg-secondary: #0d1220;
 
-  /* Surfaces */
-  --color-surface: #18181b;
-  --color-surface-alt: #27272a;
-  --color-surface-hover: #323238;
+  /* Surfaces — même famille de teinte, juste plus claires */
+  --color-surface: #121829;
+  --color-surface-alt: #1a2238;
+  --color-surface-hover: #232d4a;
 
   /* Brand */
   --color-primary: #e50914;
@@ -43,10 +43,10 @@
   --color-border: rgba(255, 255, 255, 0.08);
   --color-border-strong: rgba(255, 255, 255, 0.16);
 
-  /* Glass */
-  --color-glass-bg: rgba(24, 24, 27, 0.65);
+  /* Glass — même teinte bleu nuit que le fond, pas du gris neutre */
+  --color-glass-bg: rgba(18, 24, 41, 0.65);
   --color-overlay: rgba(0, 0, 0, 0.72);
-  --color-nav-bg: rgba(9, 9, 11, 0.9);
+  --color-nav-bg: rgba(10, 14, 26, 0.9);
 
   /* Swipe */
   --color-swipe-like: #22c55e;
@@ -60,12 +60,13 @@
   --shadow-glow-sm: 0 0 10px rgba(192, 132, 252, 0.2);
   --shadow-glow-lg: 0 0 28px rgba(192, 132, 252, 0.3);
 
-  /* Radius */
-  --radius-pill: 999px;
-  --radius-button: 14px;
-  --radius-card: 22px;
-  --radius-sheet: 30px;
-  --radius-input: 14px;
+  /* Radius — plus d'angles arrondis nulle part (voir règle universelle
+     plus bas, qui couvre aussi les rounded-* Tailwind bruts). */
+  --radius-pill: 0px;
+  --radius-button: 0px;
+  --radius-card: 0px;
+  --radius-sheet: 0px;
+  --radius-input: 0px;
 
   /* Spacing */
   --space-xs: 4px;
@@ -212,6 +213,20 @@
 }
 
 /* ─────────────────────────────────────────────────────────────────
+   Fluide — page Swipe (deck de cartes /swipe). Largeur du poster
+   central et écart des boutons like/dislike doivent rester proportionnés
+   du mobile (~360px) au grand desktop, sans jamais écraser le layout.
+   ───────────────────────────────────────────────────────────────── */
+
+@utility size-fluid-swipe-poster {
+  width: clamp(11rem, 15rem + 8vw, 1000rem);
+}
+
+@utility gap-fluid-swipe-actions {
+  gap: clamp(1.5rem, 1rem + 4vw, 4rem);
+}
+
+/* ─────────────────────────────────────────────────────────────────
    Typographie fluide — MoviePoster (cqw, pas vw : le poster est
    rendu à des tailles fixes indépendantes du viewport — sm/md/lg/
    original — donc le texte doit suivre la largeur du conteneur,
@@ -220,17 +235,14 @@
 
 @utility text-fluid-poster-score {
   font-size: clamp(0.75rem, 12cqw + 0.2rem, 1.9rem);
-  font-weight: bold;
 }
 
 @utility text-fluid-poster-title {
   font-size: clamp(0.65rem, 12cqw + 0.3rem, 1.35rem);
-  font-weight: bold;
 }
 
 @utility text-fluid-poster-meta {
   font-size: clamp(0.55rem, 2.5cqw + 0.35rem, 0.9rem);
-  font-weight: bold;
 }
 
 @layer base {
@@ -260,23 +272,7 @@
 }
 
 body {
-  background:
-    radial-gradient(
-      circle at top left,
-      color-mix(in srgb, var(--color-accent) 15%, transparent),
-      transparent 35%
-    ),
-    radial-gradient(
-      circle at top right,
-      color-mix(in srgb, var(--color-primary) 12%, transparent),
-      transparent 30%
-    ),
-    radial-gradient(
-      circle at bottom,
-      color-mix(in srgb, var(--color-secondary) 8%, transparent),
-      transparent 45%
-    ),
-    var(--color-bg-primary);
+  background: var(--color-bg-primary);
 
   color: var(--color-text-primary);
 
@@ -302,6 +298,14 @@ body {
   border-color: var(--color-border);
 }
 
+/* ✅ Aucun angle arrondi nulle part — tue toutes les classes rounded-*
+   Tailwind (rounded-full, rounded-xl, rounded-lg, arbitraires...) en une
+   seule règle plutôt que d'éditer ~150 usages dispersés dans ~25 fichiers.
+   Les tokens --radius-* ci-dessus sont aussi à 0 pour rester cohérents. */
+* {
+  border-radius: 0 !important;
+}
+
 ::-webkit-scrollbar {
   width: 8px;
   height: 8px;
@@ -318,6 +322,17 @@ body {
 
 ::-webkit-scrollbar-thumb:hover {
   background: var(--color-secondary);
+}
+
+/* ✅ Utilisée par les rangées de recommandation (SectionRow, GenreCarousel,
+   SimilarMedia) — jamais définie avant malgré la classe déjà posée partout,
+   donc sans effet (le scrollbar custom ci-dessus s'affichait quand même). */
+.scrollbar-hide {
+  scrollbar-width: none; /* Firefox */
+  -ms-overflow-style: none; /* Edge legacy */
+}
+.scrollbar-hide::-webkit-scrollbar {
+  display: none; /* Chrome/Safari/Edge Chromium */
 }
 
 :focus-visible {

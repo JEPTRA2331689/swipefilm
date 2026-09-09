@@ -71,8 +71,8 @@ bld/
 
 # Visual Studio 2015/2017 cache/options directory
 .vs/
-# Uncomment if you have tasks that create the project's static files in wwwroot
-#wwwroot/
+# ✅ Peuplé au build (export statique du frontend copié dedans) — jamais commité
+swipefilm/swipefilm/wwwroot/
 
 # Visual Studio 2017 auto generated files
 Generated\ Files/
@@ -531,6 +531,9 @@ logs/
 
 # Archives (backups, exports — not meant to be versioned)
 *.zip
+
+# Instance config (Jellyfin/Plex/Radarr/Sonarr, secrets in clear — never commit)
+swipefilm/swipefilm/config/
 
 # Stray zip extraction that ended up tracked by mistake
 /extracted/

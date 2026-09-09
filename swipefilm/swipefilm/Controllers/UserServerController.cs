@@ -14,26 +14,24 @@ namespace swipefilm.Controllers
     [RequirePermission(Permission.Admin)]
     public class UserServerController : ControllerBase
     {
-        private readonly IServerConfigService _serverService;
+        private readonly IAppConfigService _config;
 
-        public UserServerController(IServerConfigService serverService)
+        public UserServerController(IAppConfigService config)
         {
-            _serverService = serverService;
+            _config = config;
         }
 
         [HttpGet]
-        public async Task<IActionResult> GetServer()
+        public IActionResult GetServer()
         {
-            var server = await _serverService.GetConfigAsync();
+            var server = _config.GetServer();
             if (server is null) return Ok((object?)null);
 
             return Ok(new
             {
-                server.Id,
                 server.FriendlyName,
                 server.Type,
                 server.LastSyncAt,
-                server.CreatedAt
             });
         }
 
@@ -42,10 +40,9 @@ namespace swipefilm.Controllers
         {
             try
             {
-                var server = await _serverService.ConfigureAsync(dto);
+                var server = await _config.ConfigureServerAsync(dto);
                 return Ok(new
                 {
-                    server.Id,
                     server.FriendlyName,
                     server.Type,
                     Message = "Serveur configuré — synchronisation démarrée en arrière-plan"
@@ -61,7 +58,7 @@ namespace swipefilm.Controllers
         [HttpPost("test")]
         public async Task<IActionResult> TestConnection([FromBody] TestConnectionDto dto)
         {
-            var ok = await _serverService.TestConnectionAsync(dto);
+            var ok = await _config.TestServerConnectionAsync(dto);
             return ok
                 ? Ok(new { Success = true, Message = "Connexion réussie" })
                 : BadRequest(new { Success = false, Message = "Connexion impossible" });

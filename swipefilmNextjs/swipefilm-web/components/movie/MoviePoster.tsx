@@ -76,7 +76,7 @@ export function MoviePoster({
 
           {/* Badge de disponibilité — seul élément visible en tout temps */}
           <div className="absolute top-2 left-2 z-10">
-            <AvailabilityDot isAvailable={movie.isAvailable} />
+            <AvailabilityDot isAvailable={movie.isAvailable}/>
           </div>
 
           {/* Dégradé + texte — révélés uniquement au survol */}
@@ -92,16 +92,16 @@ export function MoviePoster({
 
             {/* Bas : titre + méta */}
             <div className="flex flex-col gap-1.5">
-              <p className="text-fluid-poster-title text-text-primary-inside-poster line-clamp-2 font-medium drop-shadow">
+              <p className="font-display text-fluid-poster-title text-text-primary-inside-poster line-clamp-2 drop-shadow">
                 {movie.title}
               </p>
               {size !== "sm" && (
                 <div className="flex flex-row gap-1.5">
-                  <span className="text-fluid-poster-meta text-text-primary-inside-poster rounded-full bg-black/40 px-2 py-1 font-medium backdrop-blur-sm">
+                  <span className="font-body text-fluid-poster-meta text-text-primary-inside-poster rounded-full bg-black/40 px-2 py-1 font-medium backdrop-blur-sm">
                     {year}
                   </span>
                   {movie.runtimeMinutes && (
-                    <span className="text-fluid-poster-meta text-text-primary-inside-poster rounded-full bg-black/40 px-2 py-1 font-medium backdrop-blur-sm">
+                    <span className="font-body text-fluid-poster-meta text-text-primary-inside-poster rounded-full bg-black/40 px-2 py-1 backdrop-blur-sm">
                       {movie.runtimeMinutes} min
                     </span>
                   )}
