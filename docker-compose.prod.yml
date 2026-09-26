@@ -1,3 +1,6 @@
+# docker-compose.prod.yml — utilisé sur le serveur (pas en local)
+# L'image est tirée du registry, pas buildée sur place.
+
 services:
   postgres:
     image: postgres:16-alpine
@@ -5,7 +8,7 @@ services:
     environment:
       POSTGRES_DB: swipefilm
       POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Défini dans .env}
     volumes:
       - postgres-data:/var/lib/postgresql/data
     healthcheck:
@@ -15,20 +18,20 @@ services:
       retries: 10
 
   app:
-    image: ghcr.io/jeptra2331689/swipefilm:latest
+    image: ghcr.io/JEPTRA2331689/swipefilm:latest
     restart: unless-stopped
     depends_on:
       postgres:
         condition: service_healthy
+    env_file:
+      - .env
     environment:
       ConnectionStrings__DefaultConnection: "Host=postgres;Port=5432;Database=swipefilm;Username=postgres;Password=${POSTGRES_PASSWORD}"
-      Jwt__Secret: ${JWT_SECRET:?Set JWT_SECRET in .env}
-      Tmdb__ApiKey: ${TMDB_API_KEY:?Set TMDB_API_KEY in .env}
     volumes:
       - app-config:/app/config
       - app-logs:/app/logs
     ports:
-      - "${PORT:-8096}:3000"
+      - "8000:3000"
     healthcheck:
       test: wget --no-verbose --tries=1 --spider http://localhost:3000/api/setup/status || exit 1
       start_period: 20s
