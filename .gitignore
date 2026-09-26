@@ -528,6 +528,9 @@ obj/
 
 # Serilog rolling file logs
 logs/
+# Exception — dossier features/logs (code source)
+!**/features/logs/
+!**/features/logs/**
 
 # Archives (backups, exports — not meant to be versioned)
 *.zip
