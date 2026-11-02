@@ -92,6 +92,7 @@ export default function ListPage() {
   const [filter, setFilter] = useState<FilterKey>("all");
   const [sort, setSort] = useState<SortKey>("date");
   const [page, setPage] = useState(1);
+  const [actionError, setActionError] = useState<string | null>(null);
 
   // tmdbId → vraie requête backend (si elle existe)
   const [requestMap, setRequestMap] = useState<Record<number, MovieRequest>>(
@@ -99,6 +100,11 @@ export default function ListPage() {
   );
   // movieId → "requesting" (en cours d'envoi)
   const [submitting, setSubmitting] = useState<Set<string>>(new Set());
+
+  function showError(msg: string) {
+    setActionError(msg);
+    setTimeout(() => setActionError(null), 4000);
+  }
 
   // Chargement initial des requêtes existantes
   useEffect(() => {
@@ -148,7 +154,7 @@ export default function ListPage() {
       );
       setRequestMap((prev) => ({ ...prev, [movie.tmdbId]: created }));
     } catch {
-      /* silencieux */
+      showError("La requête a échoué. Réessaie dans un instant.");
     } finally {
       setSubmitting((s) => {
         const n = new Set(s);
@@ -156,7 +162,7 @@ export default function ListPage() {
         return n;
       });
     }
-  }, []);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleCancel = useCallback(async (requestId: string) => {
     try {
@@ -175,9 +181,9 @@ export default function ListPage() {
         };
       });
     } catch {
-      /* silencieux */
+      showError("Impossible d'annuler la requête. Réessaie dans un instant.");
     }
-  }, []);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleRemove = useCallback(
     async (movieId: string) => {
@@ -200,6 +206,16 @@ export default function ListPage() {
             {movies.length} titre{movies.length !== 1 ? "s" : ""} likés
           </p>
         </div>
+
+        {/* ── Toast erreur action ── */}
+        {actionError && (
+          <div
+            role="alert"
+            className="border-error/30 bg-error/10 text-error mb-4 rounded px-4 py-2 text-sm"
+          >
+            {actionError}
+          </div>
+        )}
 
         {/* ── Filtres de disponibilité ── */}
         <div className="mb-1 flex gap-2">
@@ -326,8 +342,8 @@ export default function ListPage() {
                   {/* Bouton retirer (discret, apparaît au hover) */}
                   <button
                     onClick={() => handleRemove(movie.id)}
-                    className="bg-surface-alt border-border text-text-secondary/50 absolute top-2 right-2 flex h-6 w-6 cursor-pointer items-center justify-center rounded-full border opacity-0 transition-all group-hover:opacity-100 hover:border-red-500/30 hover:text-red-400"
-                    title="Retirer de la liste"
+                    aria-label="Retirer de la liste"
+                    className="bg-surface-alt border-border text-text-secondary absolute top-2 right-2 flex h-6 w-6 cursor-pointer items-center justify-center rounded-full border opacity-100 transition-all hover:border-red-500/30 hover:text-red-400 md:opacity-0 md:group-hover:opacity-100"
                   >
                     <X className="size-3.5" />
                   </button>
@@ -392,7 +408,7 @@ export default function ListPage() {
 
         {/* Info pagination */}
         {filtered.length > 0 && (
-          <p className="text-text-secondary/50 mt-3 text-center text-xs">
+          <p className="text-text-muted mt-3 text-center text-xs">
             {(safePage - 1) * PAGE_SIZE + 1}–
             {Math.min(safePage * PAGE_SIZE, filtered.length)} sur{" "}
             {filtered.length} films

@@ -40,6 +40,7 @@ export default function MovieDetailClient() {
   const [requesting, setRequesting] = useState(false);
   const [requested, setRequested] = useState(false);
   const [showRequestModal, setShowRequestModal] = useState(false);
+  const [requestError, setRequestError] = useState<string | null>(null);
 
   async function handleSwipe(direction: "Right" | "Left") {
     if (!movie) return;
@@ -59,12 +60,13 @@ export default function MovieDetailClient() {
   async function handleRequest(opts?: RequestOptions) {
     if (!movie) return;
     setRequesting(true);
+    setRequestError(null);
     try {
       await createRequest({ movieId: movie.id, ...opts });
       setRequested(true);
       setShowRequestModal(false);
     } catch {
-      /* silencieux */
+      setRequestError("La requête a échoué. Réessaie dans un instant.");
     } finally {
       setRequesting(false);
     }
@@ -153,7 +155,7 @@ export default function MovieDetailClient() {
       </div>
 
       {/* ── Section identité ── */}
-      <div className="p- -mt-30 px-8 sm:px-60">
+      <div className="-mt-24 px-4 sm:px-8 md:px-16 lg:px-24">
         <div className="relative z-10 flex items-start gap-5 md:gap-10 lg:gap-20">
           {/* Poster */}
           {poster && (
@@ -175,6 +177,13 @@ export default function MovieDetailClient() {
             <h1 className="font-display text-text-primary text-2xl leading-tight font-bold tracking-wide uppercase sm:text-3xl md:text-6xl">
               {movie.title}
             </h1>
+
+            {/* Erreur requête */}
+            {requestError && (
+              <p role="alert" className="text-error mt-2 text-sm">
+                {requestError}
+              </p>
+            )}
 
             {/* Actions inline */}
             <div className="mt-3 flex flex-wrap gap-2 p-3">
@@ -234,9 +243,9 @@ export default function MovieDetailClient() {
                 {/* Colonne Details */}
                 <div className="w-1/2">
                   <p className="text-fluid-heading text-text-primary mb-4 font-semibold">
-                    details
+                    Détails
                   </p>
-                  <div className="space-y-3">
+                  <dl className="space-y-3">
                     {/* Année + Durée */}
                     <DetailRow label="Année">{year ?? "—"}</DetailRow>
                     <DetailRow label="Durée">{runtime ?? "—"}</DetailRow>
@@ -277,14 +286,14 @@ export default function MovieDetailClient() {
                         {extra.directors.join(", ")}
                       </DetailRow>
                     )}
-                  </div>
+                  </dl>
                 </div>
 
                 {/* Colonne Cast */}
                 {extra?.cast && extra.cast.length > 0 && (
                   <div className="w-1/2">
                     <p className="text-fluid-heading text-text-primary mb-4 font-semibold">
-                      cast
+                      Casting
                     </p>
                     <div className="space-y-3">
                       {extra.cast.slice(0, 5).map((actor) => (
@@ -336,7 +345,7 @@ export default function MovieDetailClient() {
         {movie.overview && (
           <div className="mt-8">
             <p className="text-fluid-heading text-text-primary mb-3 font-semibold">
-              Storyline
+              Synopsis
             </p>
             <p className="text-fluid-body text-text-secondary max-w-6xl leading-relaxed">
               {movie.overview}
@@ -377,10 +386,10 @@ function DetailRow({
 }) {
   return (
     <div className="flex items-start gap-3 p-2">
-      <h1 className="text-fluid-label text-text-secondary flex-shrink-0 pt-0.5 tracking-wider uppercase">
+      <dt className="text-fluid-label text-text-secondary flex-shrink-0 pt-0.5 tracking-wider uppercase">
         {label}
-      </h1>
-      <h1 className="text-fluid-value text-text-primary flex-1">{children}</h1>
+      </dt>
+      <dd className="text-fluid-value text-text-primary flex-1 m-0">{children}</dd>
     </div>
   );
 }

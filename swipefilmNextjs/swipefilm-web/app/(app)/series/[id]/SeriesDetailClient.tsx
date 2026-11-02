@@ -38,6 +38,7 @@ export default function SeriesDetailClient() {
   const [requesting, setRequesting] = useState(false);
   const [requested, setRequested] = useState(false);
   const [showRequestModal, setShowRequestModal] = useState(false);
+  const [requestError, setRequestError] = useState<string | null>(null);
 
   async function handleSwipe(direction: "Right" | "Left") {
     if (!series) return;
@@ -68,7 +69,7 @@ export default function SeriesDetailClient() {
       setRequested(true);
       setShowRequestModal(false);
     } catch {
-      /* silencieux */
+      setRequestError("La requête a échoué. Réessaie dans un instant.");
     } finally {
       setRequesting(false);
     }
@@ -158,7 +159,7 @@ export default function SeriesDetailClient() {
       </div>
 
       {/* ── Section identité ── */}
-      <div className="p- -mt-30 px-8 sm:px-60">
+      <div className="-mt-24 px-4 sm:px-8 md:px-16 lg:px-24">
         <div className="relative z-10 flex items-start gap-5 md:gap-10 lg:gap-20">
           {/* Poster */}
           {poster && (
@@ -187,6 +188,13 @@ export default function SeriesDetailClient() {
                 </Pill>
               )}
             </div>
+
+            {/* Erreur requête */}
+            {requestError && (
+              <p role="alert" className="text-error mt-2 text-sm">
+                {requestError}
+              </p>
+            )}
 
             {/* Actions inline */}
             <div className="mt-3 flex flex-wrap gap-2 p-3">
@@ -247,9 +255,9 @@ export default function SeriesDetailClient() {
                 {/* Colonne Details */}
                 <div className="w-1/2">
                   <p className="font-body text-fluid-heading text-text-primary mb-4 font-semibold">
-                    details
+                    Détails
                   </p>
-                  <div className="space-y-3">
+                  <dl className="space-y-3">
                     <DetailRow label="Année">{year ?? "—"}</DetailRow>
                     <DetailRow label="Saisons">
                       {series.numberOfSeasons > 0
@@ -294,14 +302,14 @@ export default function SeriesDetailClient() {
                         {series.createdBy.join(", ")}
                       </DetailRow>
                     )}
-                  </div>
+                  </dl>
                 </div>
 
                 {/* Colonne Cast */}
                 {series.castTop10?.length > 0 && (
                   <div className="w-1/2">
                     <p className="font-body text-fluid-heading text-text-primary mb-4 font-semibold">
-                      cast
+                      Casting
                     </p>
                     <div className="space-y-3">
                       {series.castTop10.slice(0, 5).map((name) => (
@@ -326,11 +334,11 @@ export default function SeriesDetailClient() {
           </div>
         </div>
 
-        {/* ── Storyline ── */}
+        {/* ── Synopsis ── */}
         {series.overview && (
           <div className="mt-8">
             <p className="font-display text-fluid-heading text-text-primary mb-3 ">
-              Storyline
+              Synopsis
             </p>
             <p className="text-fluid-body text-text-secondary max-w-6xl leading-relaxed">
               {series.overview}
@@ -446,10 +454,10 @@ function DetailRow({
 }) {
   return (
     <div className="flex items-start gap-3 p-2">
-      <h1 className="text-fluid-label text-text-secondary flex-shrink-0 pt-0.5 tracking-wider uppercase">
+      <dt className="text-fluid-label text-text-secondary flex-shrink-0 pt-0.5 tracking-wider uppercase">
         {label}
-      </h1>
-      <h1 className="text-fluid-value text-text-primary flex-1">{children}</h1>
+      </dt>
+      <dd className="text-fluid-value text-text-primary flex-1 m-0">{children}</dd>
     </div>
   );
 }

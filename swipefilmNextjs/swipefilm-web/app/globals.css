@@ -181,23 +181,23 @@
    ───────────────────────────────────────────────────────────────── */
 
 @utility text-fluid-label {
-  font-size: clamp(0.6rem, 1.2vw + 0.5rem, 1rem);
+  font-size: clamp(0.75rem, 1.2vw + 0.5rem, 1rem);
 }
 
 @utility text-fluid-icon {
-  font-size: clamp(0.65rem, 1.4vw + 0.5rem, 1.3rem);
+  font-size: clamp(0.75rem, 1.4vw + 0.5rem, 1.3rem);
 }
 
 @utility text-fluid-value {
-  font-size: clamp(0.7rem, 1.2vw + 0.5rem, 1rem);
+  font-size: clamp(0.75rem, 1.2vw + 0.5rem, 1rem);
 }
 
 @utility text-fluid-cast {
-  font-size: clamp(0.7rem, 1.2vw + 0.5rem, 1.5rem);
+  font-size: clamp(0.75rem, 1.2vw + 0.5rem, 1.5rem);
 }
 
 @utility text-fluid-body {
-  font-size: clamp(0.6rem, 1.1vw + 0.5rem, 1rem);
+  font-size: clamp(0.875rem, 1.1vw + 0.5rem, 1rem);
 }
 
 @utility text-fluid-heading {

@@ -20,7 +20,7 @@ export function TopNav() {
       <div className="flex items-center justify-between gap-6 px-4 py-4 md:px-12">
         <Link href="/home" className="flex items-baseline gap-2">
           <span className="font-display text-text-primary text-xl font-bold tracking-tight">
-            Swipe<span className="text-accent">Film3</span>
+            Swipe<span className="text-accent">Film</span>
           </span>
         </Link>
 

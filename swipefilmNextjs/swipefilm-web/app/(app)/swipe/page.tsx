@@ -288,9 +288,9 @@ export default function SwipePage() {
             disabled={!currentMovie || loading}
           />
         </div>
-          <h2 className="text-text-primary text-md font-semibold self-auto text-center pb-sm">
+          <p className="text-text-secondary hidden text-xs text-center pb-2 md:block">
             Utilise ← / → ou J / L pour décider — clique une carte latérale pour naviguer
-          </h2>
+          </p>
       </div>
     </div>
   );
