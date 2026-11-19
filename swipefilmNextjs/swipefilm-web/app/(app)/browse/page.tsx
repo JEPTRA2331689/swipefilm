@@ -106,7 +106,7 @@ function BrowseContent() {
         else setLoadingMore(false);
       }
     },
-    [sectionId, genre, availability, contentType ],
+    [sectionId, genre, availability, contentType],
   );
 
   useEffect(() => {

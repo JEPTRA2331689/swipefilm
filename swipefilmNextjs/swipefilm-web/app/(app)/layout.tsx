@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { api } from "@/lib/api";
 import { Permission, hasPermission } from "@/lib/permissions";
+import { MobileNav } from "@/components/layout/MobileNav";
 
 // ✅ Repris tel quel de l'ancien middleware.ts (server) — sans PUBLIC_ROUTES
 // ni le skip _next/api/favicon, devenus inutiles : ce layout ne s'exécute
@@ -74,5 +75,15 @@ export default function AppLayout({
     );
   }
 
-  return <>{children}</>;
+  // Le swipe de groupe est plein écran : en sortir casserait la session.
+  if (pathname.startsWith("/session/")) return <>{children}</>;
+
+  return (
+    <>
+      {children}
+      {/* Réserve la hauteur de la barre pour que le bas des pages reste visible. */}
+      <div aria-hidden="true" className="h-[var(--mobile-nav-h)] md:hidden" />
+      <MobileNav />
+    </>
+  );
 }

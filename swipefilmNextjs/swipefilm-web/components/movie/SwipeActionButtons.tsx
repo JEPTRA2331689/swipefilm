@@ -25,12 +25,12 @@ export function SwipeActionButtons({
         variant="skip"
         onClick={() => onSwipe("Left")}
         disabled={disabled}
-        className={cn("gap-2 px-4 py-2 font-bold", className)}
+        className={cn("group/btn gap-2 px-4 py-2 font-bold", className)}
       >
         {swipeState === "disliked" ? (
-          <X className="size-4 text-black" fill="currentColor" />
+          <X className="size-4 text-black transition-transform duration-150 group-hover/btn:scale-125" fill="currentColor" />
         ) : (
-          <ThumbsDown className="size-4 text-black" fill="currentColor" />
+          <ThumbsDown className="size-4 text-black transition-transform duration-150 group-hover/btn:-rotate-12 group-hover/btn:scale-125" fill="currentColor" />
         )}
         {swipeState === "disliked" ? "Noté" : "dislike"}
       </Button>
@@ -39,12 +39,12 @@ export function SwipeActionButtons({
         variant="like"
         onClick={() => onSwipe("Right")}
         disabled={disabled}
-        className={cn("gap-2 px-4 py-2 font-bold", className)}
+        className={cn("group/btn gap-2 px-4 py-2 font-bold", className)}
       >
         {swipeState === "liked" ? (
-          <Heart className="size-4 text-black" fill="currentColor" />
+          <Heart className="size-4 text-black transition-transform duration-150 group-hover/btn:scale-125" fill="currentColor" />
         ) : (
-          <ThumbsUp className="size-4 text-black" fill="currentColor" />
+          <ThumbsUp className="size-4 text-black transition-transform duration-150 group-hover/btn:-rotate-12 group-hover/btn:scale-125" fill="currentColor" />
         )}
         {swipeState === "liked" ? "Aimé !" : "like"}
       </Button>

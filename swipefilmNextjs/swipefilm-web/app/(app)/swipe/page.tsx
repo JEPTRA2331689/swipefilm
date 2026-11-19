@@ -181,7 +181,7 @@ export default function SwipePage() {
   }, [currentMovie, handleSwipe]);
 
   return (
-    <div className="flex h-screen flex-col overflow-hidden">
+    <div className="flex h-[calc(100dvh-var(--mobile-nav-h))] flex-col overflow-hidden md:h-screen">
       <TopNav />
 
       {/* ── Filtre disponibilité ── */}
@@ -194,7 +194,7 @@ export default function SwipePage() {
               size="sm"
               onClick={() => setAvailability(opt.value)}
               className={cn(
-                "rounded-pill px-3 py-1 text-xs",
+                "rounded-pill px-3 py-1 text-xs whitespace-nowrap",
                 availability === opt.value &&
                   "border-accent bg-accent/15 text-accent shadow-glow-sm",
               )}
@@ -207,7 +207,7 @@ export default function SwipePage() {
         <div className="flex items-center gap-3">
           {/* Badge fallback TMDB */}
           {isTmdbFallback && (
-            <span className="text-text-secondary/60 border-border rounded-pill flex items-center gap-1.5 border px-2.5 py-1 text-xs">
+            <span className="text-text-secondary/60 border-border rounded-pill hidden items-center gap-1.5 border px-2.5 py-1 text-xs sm:flex">
               <Globe className="size-4" aria-hidden="true" /> TMDB ·
               Populaires
             </span>
@@ -220,7 +220,7 @@ export default function SwipePage() {
             </span>
           )}
           {/* Compteur swipes */}
-          <span className="text-text-secondary text-xs">
+          <span className="text-text-secondary hidden text-xs sm:inline">
             {swipeCount} swipe{swipeCount !== 1 ? "s" : ""}
           </span>
         </div>

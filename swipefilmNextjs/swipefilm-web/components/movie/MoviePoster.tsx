@@ -52,7 +52,7 @@ export function MoviePoster({
       className={cn("flex-shrink-0", dims, className)}
     >
       <Link href={href} className="group block">
-        <div className="bg-surface-alt @container relative aspect-[2/3] overflow-hidden">
+        <div className="bg-surface-alt card-sweep @container relative aspect-[2/3] overflow-hidden">
           {poster ? (
             <Image
               src={poster}

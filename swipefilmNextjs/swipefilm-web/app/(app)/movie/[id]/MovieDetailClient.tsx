@@ -147,7 +147,7 @@ export default function MovieDetailClient() {
         {/* Bouton retour */}
         <button
           onClick={() => router.back()}
-          className="absolute top-4 left-4 z-10 flex items-center gap-1.5 text-sm text-white/80 transition-colors hover:text-white"
+          className="absolute top-2 left-2 z-10 flex min-h-11 items-center gap-1.5 px-2 text-sm text-white/80 transition-colors hover:text-white"
         >
           <ArrowLeft className="size-4" aria-hidden />
           Retour
@@ -156,10 +156,10 @@ export default function MovieDetailClient() {
 
       {/* ── Section identité ── */}
       <div className="-mt-24 px-4 sm:px-8 md:px-16 lg:px-24">
-        <div className="relative z-10 flex items-start gap-5 md:gap-10 lg:gap-20">
+        <div className="relative z-10 flex flex-col items-start gap-5 sm:flex-row md:gap-10 lg:gap-20">
           {/* Poster */}
           {poster && (
-            <div className="w-1/6 flex-shrink-0">
+            <div className="w-1/3 flex-shrink-0 sm:w-1/6">
               <div className="relative aspect-[2/3] overflow-hidden border border-white/10 shadow-xl">
                 <Image
                   src={poster}
@@ -173,7 +173,7 @@ export default function MovieDetailClient() {
           )}
 
           {/* Titre + sous-titre + actions */}
-          <div className="min-w-0 flex-1 pt-3">
+          <div className="w-full min-w-0 flex-1 pt-3">
             <h1 className="font-display text-text-primary text-2xl leading-tight font-bold tracking-wide uppercase sm:text-3xl md:text-6xl">
               {movie.title}
             </h1>
@@ -215,7 +215,7 @@ export default function MovieDetailClient() {
                   href={movie.jellyfinUrl}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="text-fluid-label rounded-button border-swipe-star/40 bg-swipe-star/10 text-swipe-star hover:bg-swipe-star/20 gap-1.5 px-4 py-1.5"
+                  className="text-fluid-label rounded-button btn-jellyfin gap-1.5 px-4 py-1.5"
                 >
                   <PlayCircle className="size-4" />
                   Ouvrir dans Jellyfin
@@ -228,7 +228,7 @@ export default function MovieDetailClient() {
                   href={movie.plexUrl}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="text-fluid-label rounded-button border-swipe-star/40 bg-swipe-star/10 text-swipe-star hover:bg-swipe-star/20 gap-1.5 px-4 py-1.5"
+                  className="text-fluid-label rounded-button btn-plex gap-1.5 px-4 py-1.5"
                 >
                   <PlayCircle className="size-4" />
                   Ouvrir dans Plex
@@ -239,9 +239,9 @@ export default function MovieDetailClient() {
               <div className="border-border/40 mt-6 border-t" />
 
               {/* ── Details + Cast ── */}
-              <div className="mt-6 flex max-h-[600px] gap-8">
+              <div className="mt-6 flex flex-col gap-8 sm:flex-row">
                 {/* Colonne Details */}
-                <div className="w-1/2">
+                <div className="w-full sm:w-1/2">
                   <p className="text-fluid-heading text-text-primary mb-4 font-semibold">
                     Détails
                   </p>
@@ -291,7 +291,7 @@ export default function MovieDetailClient() {
 
                 {/* Colonne Cast */}
                 {extra?.cast && extra.cast.length > 0 && (
-                  <div className="w-1/2">
+                  <div className="w-full sm:w-1/2">
                     <p className="text-fluid-heading text-text-primary mb-4 font-semibold">
                       Casting
                     </p>
@@ -331,7 +331,6 @@ export default function MovieDetailClient() {
                     </div>
                   </div>
                 )}
-                <div className="xl:bg-border/40 flex-none lg:h-0.5 xl:w-1/2" />
               </div>
               {/* ── Ligne séparatrice ── */}
               <div className="border-border/40 mt-8 border-t" />

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { SetupBackdrop } from "@/components/onboarding/SetupBackdrop";
 import { SetupSteps } from "@/components/onboarding/SetupSteps";
@@ -13,7 +13,7 @@ import { RadarrOnboardingStep } from "@/features/radarr/components/RadarrOnboard
 import { skipRadarr } from "@/features/radarr/api";
 import { SonarrOnboardingStep } from "@/features/sonarr/components/SonarrOnboardingStep";
 import { skipSonarr } from "@/features/sonarr/api";
-import { setupAdmin, fetchMe } from "@/features/auth/api";
+import { setupAdmin, fetchMe, checkSetupStatus } from "@/features/auth/api";
 import { setupServer, normalizeServer } from "@/features/media-server/api";
 import { useAppStore } from "@/lib/store";
 import { cn } from "@/lib/utils";
@@ -45,6 +45,22 @@ export default function OnboardingPage() {
   const { setUser, setServer } = useAppStore();
   const [step, setStep] = useState<Step>("admin");
   const stepIndex = STEPS.findIndex((s) => s.key === step);
+
+  // Après un rechargement l'admin existe déjà : revenir à l'étape 1
+  // bloquerait sur « Un administrateur existe déjà ».
+  useEffect(() => {
+    (async () => {
+      const { hasAdmin } = await checkSetupStatus();
+      if (!hasAdmin) return;
+      try {
+        setUser(await fetchMe());
+        setStep((s) => (s === "admin" ? "public-url" : s));
+      } catch {
+        // Session perdue : le login renvoie ici tant qu'aucun serveur n'est configuré.
+        router.replace("/login");
+      }
+    })().catch(() => {});
+  }, [router, setUser]);
 
   // ── Handlers ──────────────────────────────────────────────────────
 

@@ -1,6 +1,13 @@
 import type { NextConfig } from "next";
 
+const isDev = process.env.NODE_ENV === "development";
+
 const nextConfig: NextConfig = {
+  ...(isDev && {
+    async rewrites() {
+      return [{ source: "/api/:path*", destination: "http://localhost:5250/api/:path*" }];
+    },
+  }),
   /* config options here */
   // ✅ Pas de serveur Node en prod — le backend .NET sert ces fichiers
   // statiques directement (même pattern que Radarr/Sonarr). L'optimiseur
@@ -9,7 +16,7 @@ const nextConfig: NextConfig = {
   images: {
     unoptimized: true,
   },
-  output: "export",
+  ...(!isDev && { output: "export" as const }),
 };
 
 export default nextConfig;

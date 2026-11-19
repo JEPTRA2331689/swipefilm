@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Settings, User } from "lucide-react";
@@ -14,9 +15,26 @@ const navItems = [
 
 export function TopNav() {
   const pathname = usePathname();
+  const [hidden, setHidden] = useState(false);
+
+  useEffect(() => {
+    let lastY = window.scrollY;
+    function onScroll() {
+      const y = window.scrollY;
+      setHidden(y > lastY && y > 80);
+      lastY = y;
+    }
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => window.removeEventListener("scroll", onScroll);
+  }, []);
 
   return (
-    <header className="border-border bg-bg-primary/85 sticky top-0 z-50 border-b backdrop-blur-md">
+    <header
+      className={cn(
+        "border-border bg-bg-primary/85 sticky top-0 z-50 border-b backdrop-blur-md transition-transform duration-300",
+        hidden && "-translate-y-full",
+      )}
+    >
       <div className="flex items-center justify-between gap-6 px-4 py-4 md:px-12">
         <Link href="/home" className="flex items-baseline gap-2">
           <span className="font-display text-text-primary text-xl font-bold tracking-tight">

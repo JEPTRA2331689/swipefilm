@@ -384,7 +384,10 @@ export function AutoCarousel({
 
       {/* ── Dots + jauge ── */}
       <div className="mt-3 flex flex-col items-center gap-2">
-        <div className="flex gap-1.5">
+        <p className="text-text-secondary text-xs tabular-nums md:hidden" aria-live="polite">
+          {selectedIndex + 1} / {movies.length}
+        </p>
+        <div className="hidden flex-wrap justify-center gap-1.5 md:flex">
           {movies.map((_, i) => (
             <button
               key={i}

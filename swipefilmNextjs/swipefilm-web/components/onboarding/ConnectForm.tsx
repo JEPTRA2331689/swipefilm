@@ -81,9 +81,15 @@ export function ConnectForm({
         username: authMode === "credentials" ? username.trim() : undefined,
         password: authMode === "credentials" ? password.trim() : undefined,
       });
-    } catch {
+    } catch (err) {
+      let detail: string | undefined;
+      try {
+        detail = JSON.parse((err as Error).message)?.error;
+      } catch {
+        /* corps non JSON */
+      }
       setError(
-        "La connexion a échoué — vérifie l'adresse et les identifiants.",
+        detail ?? "La connexion a échoué — vérifie l'adresse et les identifiants.",
       );
     } finally {
       setLoading(false);

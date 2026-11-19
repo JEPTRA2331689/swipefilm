@@ -17,9 +17,9 @@ export function PosterSlider({
   autoplayDelay = 3000,
 }: PosterSliderProps) {
   const loopedMovies = [
-    ...movies.map((m) => ({ ...m, _key: `a-${m.id}` })),
-    ...movies.map((m) => ({ ...m, _key: `b-${m.id}` })),
-    ...movies.map((m) => ({ ...m, _key: `c-${m.id}` })),
+    ...movies.map((m, i) => ({ ...m, _key: `a-${i}` })),
+    ...movies.map((m, i) => ({ ...m, _key: `b-${i}` })),
+    ...movies.map((m, i) => ({ ...m, _key: `c-${i}` })),
   ];
   const startIndex = Math.floor(loopedMovies.length / 2);
   const [emblaRef, emblaApi] = useEmblaCarousel(

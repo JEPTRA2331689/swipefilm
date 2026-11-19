@@ -218,7 +218,7 @@ export default function ListPage() {
         )}
 
         {/* ── Filtres de disponibilité ── */}
-        <div className="mb-1 flex gap-2">
+        <div className="mb-1 flex flex-wrap gap-2">
           {FILTERS.map((f) => {
             const count =
               f.value === "all"
@@ -232,7 +232,7 @@ export default function ListPage() {
                 variant={filter === f.value ? "primary" : "secondary"}
                 size="sm"
                 className={cn(
-                  "gap-1.5 rounded-lg",
+                  "gap-1.5 rounded-lg whitespace-nowrap",
                   filter === f.value &&
                     "bg-accent text-white shadow-sm hover:brightness-110",
                 )}
@@ -264,7 +264,7 @@ export default function ListPage() {
                 key={o.value}
                 variant={sort === o.value ? "accent-soft" : "secondary"}
                 size="sm"
-                className="rounded-lg px-3 py-1.5 text-xs"
+                className="min-h-9 rounded-lg px-3 py-1.5 text-xs whitespace-nowrap"
                 onClick={() => setSort(o.value)}
               >
                 {o.label}
