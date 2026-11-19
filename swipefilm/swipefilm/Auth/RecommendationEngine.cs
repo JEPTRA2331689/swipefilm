@@ -53,10 +53,12 @@ namespace swipefilm.Auth
 
         // ─── Profil ───────────────────────────────────────────────────
 
-        public async Task<UserProfile> GetOrCreateProfileAsync(Guid userId, AppDbContext? db = null)
+        public async Task<UserProfile> GetOrCreateProfileAsync(Guid userId, AppDbContext? db = null, bool forUpdate = false)
         {
             var cacheKey = $"profile:{userId}";
-            if (_cache.TryGetValue(cacheKey, out UserProfile? cached)) return cached!;
+            // Une écriture doit charger une entité suivie par ce DbContext : l'instance en cache
+            // vient d'une autre requête et SaveChangesAsync l'ignorerait silencieusement.
+            if (!forUpdate && _cache.TryGetValue(cacheKey, out UserProfile? cached)) return cached!;
 
             db ??= _db;
             var profile = await db.UserProfiles
@@ -241,6 +243,9 @@ namespace swipefilm.Auth
                 var targetGenres = section.TargetGenres;
                 query = query.Where(m => m.Genres.Any(g => targetGenres.Contains(g)));
             }
+
+            if (section.TargetKeywords is { Length: > 0 } targetKeywords)
+                query = query.Where(m => m.Keywords.Any(k => targetKeywords.Contains(k)));
 
             return await query
                 .OrderBy(_ => EF.Functions.Random())
@@ -519,6 +524,9 @@ namespace swipefilm.Auth
             foreach (var genre in topGenres)
                 descriptors.Add(new() { Profile = SectionProfile.ForGenre(genre) });
 
+            foreach (var theme in TopThemes(userProfile))
+                descriptors.Add(new() { Profile = SectionProfile.ForTheme(theme) });
+
             var seasonal = SectionProfile.Seasonal();
             if (seasonal is not null)
                 descriptors.Add(new() { Profile = seasonal, UseCache = true });
@@ -579,6 +587,20 @@ namespace swipefilm.Auth
                 .OrderByDescending(g => g.Key)
                 .SelectMany(g => g.OrderBy(_ => rng.Next()))
                 .ToList();
+        }
+
+        // Un thème compte s'il a au moins 3 films vus/likés et un poids positif dans le profil.
+        private static IEnumerable<Theme> TopThemes(UserProfile profile, int take = 3)
+        {
+            return ThemeCatalog.All
+                .Select(t => (
+                    Theme: t,
+                    Score: t.Keywords.Sum(k => profile.KeywordWeights.GetValueOrDefault(k, 0f)),
+                    Signals: t.Keywords.Sum(k => profile.KeywordCounts.GetValueOrDefault(k, 0))))
+                .Where(x => x.Signals >= 3 && x.Score > 0f)
+                .OrderByDescending(x => x.Score)
+                .Take(take)
+                .Select(x => x.Theme);
         }
 
         // ─── Section fast ─────────────────────────────────────────────
@@ -1364,6 +1386,9 @@ namespace swipefilm.Auth
                 query = query.Where(s => s.Genres.Any(g => targetGenres.Contains(g)));
             }
 
+            if (section.TargetKeywords is { Length: > 0 } targetKeywords)
+                query = query.Where(s => s.Keywords.Any(k => targetKeywords.Contains(k)));
+
             return await query
                 .OrderBy(_ => EF.Functions.Random())
                 .Take(5000)
@@ -1671,7 +1696,7 @@ namespace swipefilm.Auth
         {
             db ??= _db;
 
-            var profile = await GetOrCreateProfileAsync(userId, db);
+            var profile = await GetOrCreateProfileAsync(userId, db, forUpdate: true);
             var movie = await db.Movies.FindAsync(movieId);
             if (movie is null) return;
 
@@ -1713,7 +1738,7 @@ namespace swipefilm.Auth
 
         public async Task UpdateProfileFromHistoryAsync(Guid userId)
         {
-            var profile = await GetOrCreateProfileAsync(userId);
+            var profile = await GetOrCreateProfileAsync(userId, forUpdate: true);
 
             profile.GenreWeights = new Dictionary<string, float>();
             profile.DirectorWeights = new Dictionary<string, float>();
@@ -1878,10 +1903,10 @@ namespace swipefilm.Auth
         // ─── Profil série — swipe (signal immédiat) ────────────────────
 
         public async Task<UserSeriesProfile> GetOrCreateSeriesProfileAsync(
-            Guid userId, AppDbContext? db = null)
+            Guid userId, AppDbContext? db = null, bool forUpdate = false)
         {
             var cacheKey = $"seriesprofile:{userId}";
-            if (_cache.TryGetValue(cacheKey, out UserSeriesProfile? cached)) return cached!;
+            if (!forUpdate && _cache.TryGetValue(cacheKey, out UserSeriesProfile? cached)) return cached!;
 
             db ??= _db;
             var profile = await db.UserSeriesProfiles
@@ -1909,7 +1934,7 @@ namespace swipefilm.Auth
         {
             db ??= _db;
 
-            var profile = await GetOrCreateSeriesProfileAsync(userId, db);
+            var profile = await GetOrCreateSeriesProfileAsync(userId, db, forUpdate: true);
             var series = await db.Series.FindAsync(seriesId);
             if (series is null) return;
 
@@ -1950,7 +1975,7 @@ namespace swipefilm.Auth
         /// </summary>
         public async Task UpdateSeriesProfileFromHistoryAsync(Guid userId)
         {
-            var profile = await GetOrCreateSeriesProfileAsync(userId);
+            var profile = await GetOrCreateSeriesProfileAsync(userId, forUpdate: true);
 
             profile.GenreWeights = new Dictionary<string, float>();
             profile.CreatorWeights = new Dictionary<string, float>();

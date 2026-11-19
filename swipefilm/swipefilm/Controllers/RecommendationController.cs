@@ -129,6 +129,10 @@ namespace swipefilm.Controllers
                 return (isSeries ? genreProfile with { Id = sectionId } : genreProfile, isSeries);
             }
 
+            if (baseId.StartsWith("theme_")
+                && ThemeCatalog.All.FirstOrDefault(t => $"theme_{t.Id}" == baseId) is { } theme)
+                return (SectionProfile.ForTheme(theme), isSeries);
+
             var resolved = baseId switch
             {
                 "for_you" => SectionProfile.ForYou,

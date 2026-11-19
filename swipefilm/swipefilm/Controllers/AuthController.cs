@@ -58,7 +58,6 @@ namespace swipefilm.Controllers
         [HttpPost("login")]
         public async Task<IActionResult> Login([FromBody] LoginDto dto)
         {
-            Console.WriteLine(dto);
             // ✅ Le serveur Jellyfin de l'instance — un seul, partagé par tous
             var anyServer = _config.GetServer() is { } s && s.Type == ServerType.Jellyfin
                 ? s : null;
@@ -158,8 +157,8 @@ namespace swipefilm.Controllers
             try
             {
                 using var http = new HttpClient();
-                http.DefaultRequestHeaders.Add(
-                    "X-Emby-Authorization",
+                http.DefaultRequestHeaders.TryAddWithoutValidation(
+                    "Authorization",
                     "MediaBrowser Client=\"SwipeFilm\", Device=\"API\", DeviceId=\"swipefilm\", Version=\"1.0.0\""
                 );
 
@@ -178,8 +177,8 @@ namespace swipefilm.Controllers
             {
                 var (url, _) = _config.GetServerCredentials();
                 using var http = new HttpClient();
-                http.DefaultRequestHeaders.Add(
-                    "X-Emby-Authorization",
+                http.DefaultRequestHeaders.TryAddWithoutValidation(
+                    "Authorization",
                     $"MediaBrowser Client=\"SwipeFilm\", Device=\"API\", " +
                     $"DeviceId=\"BOT_swipefilm_{username}\", Version=\"1.0.0\""
                 );
@@ -214,7 +213,7 @@ namespace swipefilm.Controllers
                 using var http = new HttpClient();
 
                 // Récupère les détails du user depuis l'API admin Jellyfin
-                var response = await http.GetAsync(
+                var response = await JellyfinHttp.GetAsync(http, 
                     $"{url}/Users/{jellyfinUserId}?api_key={apiKey}");
 
                 if (!response.IsSuccessStatusCode) return null;
@@ -265,7 +264,7 @@ namespace swipefilm.Controllers
             try
             {
                 using var http = new HttpClient();
-                var response = await http.GetAsync(
+                var response = await JellyfinHttp.GetAsync(http, 
                     $"{url}/System/Configuration?api_key={apiKey}");
 
                 if (!response.IsSuccessStatusCode)

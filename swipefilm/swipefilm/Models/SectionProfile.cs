@@ -105,6 +105,9 @@ namespace swipefilm.Models
         /// <summary>Genres ciblés quand FilterByTargetGenres est activé.</summary>
         public string[]? TargetGenres { get; init; } = null;
 
+        /// <summary>Pré-filtre : le film doit porter au moins un de ces mots-clés TMDB.</summary>
+        public string[]? TargetKeywords { get; init; } = null;
+
         /// <summary>
         /// Poids d'ordre d'affichage (1-100). Les sections sont triées par poids
         /// décroissant ; les sections à poids égal sont mélangées aléatoirement
@@ -333,6 +336,23 @@ namespace swipefilm.Models
         /// Pré-filtre SQL sur le genre ciblé — les films doivent réellement
         /// appartenir à ce genre, pas juste être boostés par le score de profil.
         /// </summary>
+        public static SectionProfile ForTheme(Theme theme) => new()
+        {
+            Id = $"theme_{theme.Id}",
+            Title = theme.Title,
+            Keywords = 0.6f,
+            Genres = 0.5f,
+            History = 0.4f,
+            Rating = 0.3f,
+            Language = 0.3f,
+            Popularity = 0.1f,
+            Randomness = 0.15f,
+            TargetKeywords = theme.Keywords,
+            UseBayesianRating = true,
+            MinVoteCount = 10,
+            Weight = 65,
+        };
+
         public static SectionProfile ForGenre(string genre) => new()
         {
             Id = $"genre_{genre}",

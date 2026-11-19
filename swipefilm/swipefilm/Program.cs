@@ -33,6 +33,8 @@ var builder = WebApplication.CreateBuilder(args);
 var logsDirectory = Path.Combine(builder.Environment.ContentRootPath, "logs");
 builder.Host.UseSerilog((context, configuration) => configuration
     .MinimumLevel.Information()
+    // Les URLs sortantes portent api_key / X-Plex-Token en query string.
+    .MinimumLevel.Override("System.Net.Http.HttpClient", Serilog.Events.LogEventLevel.Warning)
     .WriteTo.Console()
     .WriteTo.File(
         new JsonFormatter(renderMessage: true),

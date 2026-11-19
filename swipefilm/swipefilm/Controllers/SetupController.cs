@@ -37,9 +37,10 @@ namespace swipefilm.Controllers
         // Appelé au démarrage de l'app mobile pour savoir où rediriger
 
         [HttpGet("status")]
-        public IActionResult GetStatus()
+        public async Task<IActionResult> GetStatus()
         {
-            return Ok(new { IsSetupComplete = _config.IsSetupComplete });
+            var hasAdmin = (await _userManager.GetUsersInRoleAsync("Admin")).Any();
+            return Ok(new { IsSetupComplete = _config.IsSetupComplete, HasAdmin = hasAdmin });
         }
 
         // ─── Étape 1 : compte admin ───────────────────────────────────
@@ -115,9 +116,18 @@ namespace swipefilm.Controllers
         [HttpPost("server")]
         public async Task<IActionResult> ConfigureServer([FromBody] SetupServerDto dto)
         {
-            Console.WriteLine(dto);
             if (_config.IsSetupComplete)
                 return BadRequest(new { Error = "L'application est déjà configurée" });
+
+            if (!string.IsNullOrWhiteSpace(dto.Url)
+                && await ProbeServerTypeAsync(dto.Url) is { } detected
+                && detected != dto.Type)
+            {
+                return BadRequest(new
+                {
+                    Error = $"Cette URL pointe vers un serveur {detected}, pas {dto.Type}. Choisis le bon type de serveur."
+                });
+            }
 
             // Récupère l'admin
             var admins = await _userManager.GetUsersInRoleAsync("Admin");
@@ -140,6 +150,7 @@ namespace swipefilm.Controllers
             }
             catch (Exception ex)
             {
+                Serilog.Log.Warning("Setup serveur {Type} échoué : {Reason}", dto.Type, ex.Message);
                 return BadRequest(new { Error = $"Connexion impossible : {ex.Message}" });
             }
 
@@ -174,6 +185,28 @@ namespace swipefilm.Controllers
                 AdminsImported = adminsImported,
                 NextStep = "seerr" // ← indique à l'app d'afficher l'étape Seerr
             });
+        }
+
+        private static readonly HttpClient ProbeClient = new() { Timeout = TimeSpan.FromSeconds(5) };
+
+        // null = type indéterminé (serveur injoignable) : on laisse ConfigureServerAsync trancher.
+        private static async Task<ServerType?> ProbeServerTypeAsync(string url)
+        {
+            var baseUrl = url.TrimEnd('/');
+            try
+            {
+                using var jf = await ProbeClient.GetAsync($"{baseUrl}/System/Info/Public");
+                if (jf.IsSuccessStatusCode
+                    && (await jf.Content.ReadAsStringAsync()).Contains("\"ProductName\"", StringComparison.OrdinalIgnoreCase))
+                    return ServerType.Jellyfin;
+
+                using var plex = await ProbeClient.GetAsync($"{baseUrl}/identity");
+                if (plex.IsSuccessStatusCode
+                    && (await plex.Content.ReadAsStringAsync()).Contains("machineIdentifier", StringComparison.OrdinalIgnoreCase))
+                    return ServerType.Plex;
+            }
+            catch (Exception) { }
+            return null;
         }
 
         // ─── Étape 3 : Seerr (optionnel) ─────────────────────────────
@@ -409,7 +442,7 @@ namespace swipefilm.Controllers
             try
             {
                 using var http = new HttpClient();
-                var response = await http.GetAsync(
+                var response = await JellyfinHttp.GetAsync(http, 
                     $"{url}/System/Configuration?api_key={apiKey}");
 
                 if (!response.IsSuccessStatusCode)
@@ -443,7 +476,7 @@ namespace swipefilm.Controllers
         private async Task<List<ServerUser>> GetJellyfinUsersAsync(string url, string apiKey)
         {
             using var http = new HttpClient();
-            var response = await http.GetAsync($"{url}/Users?api_key={apiKey}");
+            var response = await JellyfinHttp.GetAsync(http, $"{url}/Users?api_key={apiKey}");
             if (!response.IsSuccessStatusCode) return [];
 
             var json = await response.Content.ReadFromJsonAsync<JsonElement>();

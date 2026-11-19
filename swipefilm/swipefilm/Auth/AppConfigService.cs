@@ -323,8 +323,8 @@ namespace swipefilm.Auth
             string url, string username, string password)
         {
             using var http = new HttpClient();
-            http.DefaultRequestHeaders.Add(
-                "X-Emby-Authorization",
+            http.DefaultRequestHeaders.TryAddWithoutValidation(
+                "Authorization",
                 "MediaBrowser Client=\"SwipeFilm\", Device=\"API\", DeviceId=\"swipefilm\", Version=\"1.0.0\""
             );
 
@@ -344,10 +344,15 @@ namespace swipefilm.Auth
         private async Task ValidateJellyfinConnectionAsync(string url, string token)
         {
             using var http = new HttpClient();
-            var response = await http.GetAsync($"{url}/System/Configuration?api_key={token}");
+            var response = await JellyfinHttp.GetAsync(http, $"{url}/System/Configuration?api_key={token}");
+            if (response.StatusCode == System.Net.HttpStatusCode.Forbidden)
+                throw new InvalidOperationException(
+                    "Ce compte Jellyfin n'est pas administrateur — utilise un compte admin Jellyfin ou une API key");
+            if (response.StatusCode == System.Net.HttpStatusCode.Unauthorized)
+                throw new InvalidOperationException("API key Jellyfin invalide");
             if (!response.IsSuccessStatusCode)
                 throw new InvalidOperationException(
-                    "Connexion Jellyfin impossible — vérifie l'URL et l'API key");
+                    $"Connexion Jellyfin impossible ({(int)response.StatusCode}) — vérifie l'URL");
         }
 
         // ─── Auth Plex ────────────────────────────────────────────────

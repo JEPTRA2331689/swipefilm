@@ -35,7 +35,7 @@ namespace swipefilm.Auth
 
             do
             {
-                var response = await _http.GetAsync(
+                var response = await JellyfinHttp.GetAsync(_http, 
                     $"{baseEndpoint}" +
                     $"?IncludeItemTypes=Movie,Series" +
                     $"&Recursive=true" +
@@ -67,7 +67,7 @@ namespace swipefilm.Auth
 
             try
             {
-                var response = await _http.GetAsync(
+                var response = await JellyfinHttp.GetAsync(_http, 
                     $"{url}/System/Configuration?api_key={token}");
 
                 if (!response.IsSuccessStatusCode) return ("en", "US");
@@ -120,7 +120,7 @@ namespace swipefilm.Auth
 
             do
             {
-                var response = await _http.GetAsync(
+                var response = await JellyfinHttp.GetAsync(_http, 
                     $"{baseEndpoint}" +
                     $"?IncludeItemTypes=Movie,Series" +
                     $"&Recursive=true" +
@@ -213,7 +213,7 @@ namespace swipefilm.Auth
                     ? $"{url}/Users/{userId}/Items"
                     : $"{url}/Items";
 
-                var response = await _http.GetAsync(
+                var response = await JellyfinHttp.GetAsync(_http, 
                     $"{baseEndpoint}" +
                     $"?IncludeItemTypes=Movie,Series" +
                     $"&Recursive=true" +
@@ -305,9 +305,11 @@ namespace swipefilm.Auth
                     watchDurationSec = totalSec;
                     abandonedAtSec = null;
                 }
-                else if (userData.TryGetProperty("Played", out var played)
-                      && played.GetBoolean()
-                      && positionTicks == 0)
+                // Déjà vu en entier : une position non nulle n'est alors qu'un revisionnage en cours.
+                // Jellyfin repasse Played à false pendant un revisionnage, mais PlayCount
+                // n'augmente qu'à la fin d'un visionnage complet.
+                else if ((userData.TryGetProperty("Played", out var played) && played.GetBoolean())
+                      || (userData.TryGetProperty("PlayCount", out var count) && count.GetInt32() > 0))
                 {
                     watchDurationSec = totalSec;
                     abandonedAtSec = null;
@@ -384,7 +386,7 @@ namespace swipefilm.Auth
 
             do
             {
-                var response = await _http.GetAsync(
+                var response = await JellyfinHttp.GetAsync(_http, 
                     $"{url}/Users/{userId}/Items" +
                     $"?IncludeItemTypes=Series" +
                     $"&Recursive=true" +
@@ -441,7 +443,7 @@ namespace swipefilm.Auth
                 ? $"{url}/Shows/{seriesServerId}/Seasons?userId={userId}"
                 : $"{url}/Shows/{seriesServerId}/Seasons";
 
-            var response = await _http.GetAsync(
+            var response = await JellyfinHttp.GetAsync(_http, 
                 $"{endpoint}&Fields=ItemCounts,ChildCount&api_key={token}");
 
             if (!response.IsSuccessStatusCode) return [];
