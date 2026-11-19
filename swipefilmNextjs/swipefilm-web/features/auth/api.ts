@@ -38,8 +38,10 @@ export async function configureSeerr(
 
 // ── Setup (première installation) ─────────────────────────────────
 
-export async function checkSetupStatus(): Promise<{ isSetupComplete: boolean; hasAdmin: boolean }> {
-  return api.get<{ isSetupComplete: boolean; hasAdmin: boolean }>("/api/setup/status", {
+export type SetupStatus = { isSetupComplete: boolean; hasAdmin: boolean };
+
+export async function checkSetupStatus(): Promise<SetupStatus> {
+  return api.get<SetupStatus>("/api/setup/status", {
     skipAuth: true,
   });
 }

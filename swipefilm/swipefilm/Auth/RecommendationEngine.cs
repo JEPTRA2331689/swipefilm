@@ -53,12 +53,10 @@ namespace swipefilm.Auth
 
         // ─── Profil ───────────────────────────────────────────────────
 
-        public async Task<UserProfile> GetOrCreateProfileAsync(Guid userId, AppDbContext? db = null, bool forUpdate = false)
+        public async Task<UserProfile> GetOrCreateProfileAsync(Guid userId, AppDbContext? db = null)
         {
             var cacheKey = $"profile:{userId}";
-            // Une écriture doit charger une entité suivie par ce DbContext : l'instance en cache
-            // vient d'une autre requête et SaveChangesAsync l'ignorerait silencieusement.
-            if (!forUpdate && _cache.TryGetValue(cacheKey, out UserProfile? cached)) return cached!;
+            if (_cache.TryGetValue(cacheKey, out UserProfile? cached)) return cached!;
 
             db ??= _db;
             var profile = await db.UserProfiles
@@ -1696,7 +1694,9 @@ namespace swipefilm.Auth
         {
             db ??= _db;
 
-            var profile = await GetOrCreateProfileAsync(userId, db, forUpdate: true);
+            // L'instance en cache n'est pas suivie par ce DbContext : SaveChanges l'ignorerait.
+            _cache.Remove($"profile:{userId}");
+            var profile = await GetOrCreateProfileAsync(userId, db);
             var movie = await db.Movies.FindAsync(movieId);
             if (movie is null) return;
 
@@ -1738,7 +1738,9 @@ namespace swipefilm.Auth
 
         public async Task UpdateProfileFromHistoryAsync(Guid userId)
         {
-            var profile = await GetOrCreateProfileAsync(userId, forUpdate: true);
+            // L'instance en cache n'est pas suivie par ce DbContext : SaveChanges l'ignorerait.
+            _cache.Remove($"profile:{userId}");
+            var profile = await GetOrCreateProfileAsync(userId);
 
             profile.GenreWeights = new Dictionary<string, float>();
             profile.DirectorWeights = new Dictionary<string, float>();
@@ -1903,10 +1905,10 @@ namespace swipefilm.Auth
         // ─── Profil série — swipe (signal immédiat) ────────────────────
 
         public async Task<UserSeriesProfile> GetOrCreateSeriesProfileAsync(
-            Guid userId, AppDbContext? db = null, bool forUpdate = false)
+            Guid userId, AppDbContext? db = null)
         {
             var cacheKey = $"seriesprofile:{userId}";
-            if (!forUpdate && _cache.TryGetValue(cacheKey, out UserSeriesProfile? cached)) return cached!;
+            if (_cache.TryGetValue(cacheKey, out UserSeriesProfile? cached)) return cached!;
 
             db ??= _db;
             var profile = await db.UserSeriesProfiles
@@ -1934,7 +1936,8 @@ namespace swipefilm.Auth
         {
             db ??= _db;
 
-            var profile = await GetOrCreateSeriesProfileAsync(userId, db, forUpdate: true);
+            _cache.Remove($"seriesprofile:{userId}");
+            var profile = await GetOrCreateSeriesProfileAsync(userId, db);
             var series = await db.Series.FindAsync(seriesId);
             if (series is null) return;
 
@@ -1975,7 +1978,8 @@ namespace swipefilm.Auth
         /// </summary>
         public async Task UpdateSeriesProfileFromHistoryAsync(Guid userId)
         {
-            var profile = await GetOrCreateSeriesProfileAsync(userId, forUpdate: true);
+            _cache.Remove($"seriesprofile:{userId}");
+            var profile = await GetOrCreateSeriesProfileAsync(userId);
 
             profile.GenreWeights = new Dictionary<string, float>();
             profile.CreatorWeights = new Dictionary<string, float>();

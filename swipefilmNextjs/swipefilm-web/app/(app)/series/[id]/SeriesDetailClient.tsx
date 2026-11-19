@@ -58,6 +58,7 @@ export default function SeriesDetailClient() {
   async function handleRequest(opts: SeriesRequestSubmitOptions) {
     if (!series) return;
     setRequesting(true);
+    setRequestError(null);
     try {
       await createRequest({
         seriesId: series.id,

@@ -324,9 +324,7 @@ namespace swipefilm.Auth
         {
             using var http = new HttpClient();
             http.DefaultRequestHeaders.TryAddWithoutValidation(
-                "Authorization",
-                "MediaBrowser Client=\"SwipeFilm\", Device=\"API\", DeviceId=\"swipefilm\", Version=\"1.0.0\""
-            );
+                "Authorization", JellyfinHttp.AuthHeader(null));
 
             var response = await http.PostAsJsonAsync(
                 $"{url}/Users/AuthenticateByName",
@@ -344,7 +342,7 @@ namespace swipefilm.Auth
         private async Task ValidateJellyfinConnectionAsync(string url, string token)
         {
             using var http = new HttpClient();
-            var response = await JellyfinHttp.GetAsync(http, $"{url}/System/Configuration?api_key={token}");
+            var response = await JellyfinHttp.GetAsync(http, $"{url}/System/Configuration", token);
             if (response.StatusCode == System.Net.HttpStatusCode.Forbidden)
                 throw new InvalidOperationException(
                     "Ce compte Jellyfin n'est pas administrateur — utilise un compte admin Jellyfin ou une API key");

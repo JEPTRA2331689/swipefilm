@@ -49,17 +49,18 @@ export default function OnboardingPage() {
   // Après un rechargement l'admin existe déjà : revenir à l'étape 1
   // bloquerait sur « Un administrateur existe déjà ».
   useEffect(() => {
-    (async () => {
-      const { hasAdmin } = await checkSetupStatus();
-      if (!hasAdmin) return;
-      try {
-        setUser(await fetchMe());
+    Promise.all([checkSetupStatus(), fetchMe().catch(() => null)])
+      .then(([{ hasAdmin }, me]) => {
+        if (!hasAdmin) return;
+        if (!me) {
+          // Session perdue : le login renvoie ici tant qu'aucun serveur n'est configuré.
+          router.replace("/login");
+          return;
+        }
+        setUser(me);
         setStep((s) => (s === "admin" ? "public-url" : s));
-      } catch {
-        // Session perdue : le login renvoie ici tant qu'aucun serveur n'est configuré.
-        router.replace("/login");
-      }
-    })().catch(() => {});
+      })
+      .catch(() => {});
   }, [router, setUser]);
 
   // ── Handlers ──────────────────────────────────────────────────────

@@ -130,7 +130,7 @@ namespace swipefilm.Controllers
             }
 
             if (baseId.StartsWith("theme_")
-                && ThemeCatalog.All.FirstOrDefault(t => $"theme_{t.Id}" == baseId) is { } theme)
+                && ThemeCatalog.ById.TryGetValue(baseId["theme_".Length..], out var theme))
                 return (SectionProfile.ForTheme(theme), isSeries);
 
             var resolved = baseId switch

@@ -43,10 +43,18 @@ async function request<T>(
 
 export class ApiError extends Error {
   status: number;
+  /** Message lisible renvoyé par le backend ({ error: "…" }), s'il y en a un. */
+  detail?: string;
   constructor(status: number, message: string) {
     super(message);
     this.status = status;
     this.name = "ApiError";
+    try {
+      const error = JSON.parse(message)?.error;
+      if (typeof error === "string") this.detail = error;
+    } catch {
+      /* corps non JSON */
+    }
   }
 }
 

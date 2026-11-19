@@ -41,8 +41,7 @@ namespace swipefilm.Auth
                     $"&Recursive=true" +
                     $"&Fields=ProviderIds,RunTimeTicks,OfficialRating" +
                     $"&StartIndex={startIndex}" +
-                    $"&Limit={pageSize}" +
-                    $"&api_key={token}");
+                    $"&Limit={pageSize}", token);
 
                 Console.WriteLine($"[Jellyfin] Library GET {response.StatusCode} — {baseEndpoint}");
 
@@ -68,7 +67,7 @@ namespace swipefilm.Auth
             try
             {
                 var response = await JellyfinHttp.GetAsync(_http, 
-                    $"{url}/System/Configuration?api_key={token}");
+                    $"{url}/System/Configuration", token);
 
                 if (!response.IsSuccessStatusCode) return ("en", "US");
 
@@ -127,8 +126,7 @@ namespace swipefilm.Auth
                     $"&Fields=ProviderIds,RunTimeTicks,OfficialRating" +
                     $"&MinDateLastSaved={sinceStr}" + // ← seulement les nouveaux
                     $"&StartIndex={startIndex}" +
-                    $"&Limit={pageSize}" +
-                    $"&api_key={token}");
+                    $"&Limit={pageSize}", token);
 
                 response.EnsureSuccessStatusCode();
                 var json = await response.Content.ReadFromJsonAsync<JsonElement>();
@@ -222,8 +220,7 @@ namespace swipefilm.Auth
                     $"&SortOrder=Descending" +
                     dateFilter +
                     $"&StartIndex={startIndex}" +
-                    $"&Limit={pageSize}" +
-                    $"&api_key={token}");
+                    $"&Limit={pageSize}", token);
 
                 response.EnsureSuccessStatusCode();
                 var json = await response.Content.ReadFromJsonAsync<JsonElement>();
@@ -395,8 +392,7 @@ namespace swipefilm.Auth
                     $"&SortOrder=Descending" +
                     dateFilter +
                     $"&StartIndex={startIndex}" +
-                    $"&Limit={pageSize}" +
-                    $"&api_key={token}");
+                    $"&Limit={pageSize}", token);
 
                 if (!response.IsSuccessStatusCode) break;
 
@@ -444,7 +440,7 @@ namespace swipefilm.Auth
                 : $"{url}/Shows/{seriesServerId}/Seasons";
 
             var response = await JellyfinHttp.GetAsync(_http, 
-                $"{endpoint}&Fields=ItemCounts,ChildCount&api_key={token}");
+                $"{endpoint}&Fields=ItemCounts,ChildCount", token);
 
             if (!response.IsSuccessStatusCode) return [];
 

@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/Button";
 import { cn } from "@/lib/utils";
+import { ApiError } from "@/lib/api";
 
 interface ServerOption {
   id: string;
@@ -82,14 +83,9 @@ export function ConnectForm({
         password: authMode === "credentials" ? password.trim() : undefined,
       });
     } catch (err) {
-      let detail: string | undefined;
-      try {
-        detail = JSON.parse((err as Error).message)?.error;
-      } catch {
-        /* corps non JSON */
-      }
       setError(
-        detail ?? "La connexion a échoué — vérifie l'adresse et les identifiants.",
+        (err instanceof ApiError && err.detail) ||
+          "La connexion a échoué — vérifie l'adresse et les identifiants.",
       );
     } finally {
       setLoading(false);

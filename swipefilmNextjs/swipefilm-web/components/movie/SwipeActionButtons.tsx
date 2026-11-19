@@ -9,6 +9,9 @@ interface SwipeActionButtonsProps {
   className?: string;
 }
 
+const iconCls = "size-4 text-black transition-transform duration-150 group-hover/btn:scale-125";
+const tiltCls = "group-hover/btn:-rotate-12";
+
 // ✅ Like/Dislike partagés fiche film + fiche série + deck de swipe — fond
 // plein, texte noir gras, icône directement accolée au texte.
 export function SwipeActionButtons({
@@ -28,9 +31,9 @@ export function SwipeActionButtons({
         className={cn("group/btn gap-2 px-4 py-2 font-bold", className)}
       >
         {swipeState === "disliked" ? (
-          <X className="size-4 text-black transition-transform duration-150 group-hover/btn:scale-125" fill="currentColor" />
+          <X className={iconCls} fill="currentColor" />
         ) : (
-          <ThumbsDown className="size-4 text-black transition-transform duration-150 group-hover/btn:-rotate-12 group-hover/btn:scale-125" fill="currentColor" />
+          <ThumbsDown className={cn(iconCls, tiltCls)} fill="currentColor" />
         )}
         {swipeState === "disliked" ? "Noté" : "dislike"}
       </Button>
@@ -42,9 +45,9 @@ export function SwipeActionButtons({
         className={cn("group/btn gap-2 px-4 py-2 font-bold", className)}
       >
         {swipeState === "liked" ? (
-          <Heart className="size-4 text-black transition-transform duration-150 group-hover/btn:scale-125" fill="currentColor" />
+          <Heart className={iconCls} fill="currentColor" />
         ) : (
-          <ThumbsUp className="size-4 text-black transition-transform duration-150 group-hover/btn:-rotate-12 group-hover/btn:scale-125" fill="currentColor" />
+          <ThumbsUp className={cn(iconCls, tiltCls)} fill="currentColor" />
         )}
         {swipeState === "liked" ? "Aimé !" : "like"}
       </Button>

@@ -2,15 +2,8 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Bookmark, Home, Layers, Search } from "lucide-react";
 import { cn } from "@/lib/utils";
-
-const items = [
-  { href: "/home", label: "Accueil", icon: Home },
-  { href: "/swipe", label: "Swipe", icon: Layers },
-  { href: "/search", label: "Rechercher", icon: Search },
-  { href: "/list", label: "Ma liste", icon: Bookmark },
-];
+import { isNavActive, navItems } from "./navItems";
 
 export function MobileNav() {
   const pathname = usePathname();
@@ -21,8 +14,8 @@ export function MobileNav() {
       className="border-border bg-bg-primary/90 fixed inset-x-0 bottom-0 z-50 border-t pb-[env(safe-area-inset-bottom)] backdrop-blur-md md:hidden"
     >
       <ul className="grid h-16 grid-cols-4">
-        {items.map(({ href, label, icon: Icon }) => {
-          const active = pathname === href || pathname.startsWith(`${href}/`);
+        {navItems.map(({ href, label, icon: Icon }) => {
+          const active = isNavActive(pathname, href);
           return (
             <li key={href}>
               <Link

@@ -16,11 +16,9 @@ export function PosterSlider({
   movies,
   autoplayDelay = 3000,
 }: PosterSliderProps) {
-  const loopedMovies = [
-    ...movies.map((m, i) => ({ ...m, _key: `a-${i}` })),
-    ...movies.map((m, i) => ({ ...m, _key: `b-${i}` })),
-    ...movies.map((m, i) => ({ ...m, _key: `c-${i}` })),
-  ];
+  const loopedMovies = ["a", "b", "c"].flatMap((copy) =>
+    movies.map((m, i) => ({ ...m, _key: `${copy}-${i}` })),
+  );
   const startIndex = Math.floor(loopedMovies.length / 2);
   const [emblaRef, emblaApi] = useEmblaCarousel(
     { loop: true, align: "center", startIndex, skipSnaps: true },

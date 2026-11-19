@@ -54,7 +54,7 @@ namespace swipefilm.Auth
             var requestService = scope.ServiceProvider.GetRequiredService<MediaRequestService>();
             await requestService.ConfirmAvailabilityAsync();
 
-            await RebuildProfilesAsync(scope, db);
+            await RebuildProfilesAsync(db);
 
             _logger.LogInformation(
                 "[Hangfire] Sync terminée pour {Name}", server.FriendlyName);
@@ -62,9 +62,8 @@ namespace swipefilm.Auth
 
         // L'historique vient d'être réimporté : sans recalcul, seuls les nouveaux comptes
         // (onboarding) avaient un profil, les autres restaient vides.
-        private async Task RebuildProfilesAsync(IServiceScope scope, AppDbContext db)
+        private async Task RebuildProfilesAsync(AppDbContext db)
         {
-            var engine = scope.ServiceProvider.GetRequiredService<RecommendationEngine>();
             var userIds = await db.Users.AsNoTracking()
                 .Where(u => !u.IsGuest)
                 .Select(u => u.Id)
@@ -72,6 +71,10 @@ namespace swipefilm.Auth
 
             foreach (var userId in userIds)
             {
+                // Un scope par utilisateur : un SaveChanges en échec ne doit pas rester
+                // dans le DbContext et faire échouer les profils suivants.
+                using var userScope = _services.CreateScope();
+                var engine = userScope.ServiceProvider.GetRequiredService<RecommendationEngine>();
                 try
                 {
                     await engine.UpdateProfileFromHistoryAsync(userId);

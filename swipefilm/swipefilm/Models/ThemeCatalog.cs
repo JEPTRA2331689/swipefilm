@@ -28,5 +28,7 @@ namespace swipefilm.Models
             new("sports", "Esprit sportif", ["sports", "boxing", "football (soccer)", "basketball"]),
             new("music", "Destins musicaux", ["musician", "rock band", "biography of musician", "hip-hop"]),
         ];
+
+        public static readonly IReadOnlyDictionary<string, Theme> ById = All.ToDictionary(t => t.Id);
     }
 }

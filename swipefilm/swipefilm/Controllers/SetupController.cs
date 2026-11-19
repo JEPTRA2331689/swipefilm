@@ -193,20 +193,27 @@ namespace swipefilm.Controllers
         private static async Task<ServerType?> ProbeServerTypeAsync(string url)
         {
             var baseUrl = url.TrimEnd('/');
+            var jellyfin = ResponseContainsAsync($"{baseUrl}/System/Info/Public", "\"ProductName\"");
+            var plex = ResponseContainsAsync($"{baseUrl}/identity", "machineIdentifier");
+            await Task.WhenAll(jellyfin, plex);
+
+            if (jellyfin.Result) return ServerType.Jellyfin;
+            if (plex.Result) return ServerType.Plex;
+            return null;
+        }
+
+        private static async Task<bool> ResponseContainsAsync(string url, string marker)
+        {
             try
             {
-                using var jf = await ProbeClient.GetAsync($"{baseUrl}/System/Info/Public");
-                if (jf.IsSuccessStatusCode
-                    && (await jf.Content.ReadAsStringAsync()).Contains("\"ProductName\"", StringComparison.OrdinalIgnoreCase))
-                    return ServerType.Jellyfin;
-
-                using var plex = await ProbeClient.GetAsync($"{baseUrl}/identity");
-                if (plex.IsSuccessStatusCode
-                    && (await plex.Content.ReadAsStringAsync()).Contains("machineIdentifier", StringComparison.OrdinalIgnoreCase))
-                    return ServerType.Plex;
+                using var response = await ProbeClient.GetAsync(url);
+                return response.IsSuccessStatusCode
+                    && (await response.Content.ReadAsStringAsync()).Contains(marker, StringComparison.OrdinalIgnoreCase);
             }
-            catch (Exception) { }
-            return null;
+            catch (Exception)
+            {
+                return false;
+            }
         }
 
         // ─── Étape 3 : Seerr (optionnel) ─────────────────────────────
@@ -443,7 +450,7 @@ namespace swipefilm.Controllers
             {
                 using var http = new HttpClient();
                 var response = await JellyfinHttp.GetAsync(http, 
-                    $"{url}/System/Configuration?api_key={apiKey}");
+                    $"{url}/System/Configuration", apiKey);
 
                 if (!response.IsSuccessStatusCode)
                     return ("en", "US"); // ✅ fallback sécurisé
@@ -476,7 +483,7 @@ namespace swipefilm.Controllers
         private async Task<List<ServerUser>> GetJellyfinUsersAsync(string url, string apiKey)
         {
             using var http = new HttpClient();
-            var response = await JellyfinHttp.GetAsync(http, $"{url}/Users?api_key={apiKey}");
+            var response = await JellyfinHttp.GetAsync(http, $"{url}/Users", apiKey);
             if (!response.IsSuccessStatusCode) return [];
 
             var json = await response.Content.ReadFromJsonAsync<JsonElement>();

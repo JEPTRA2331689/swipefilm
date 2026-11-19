@@ -1,28 +1,27 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Settings, User } from "lucide-react";
 import { cn } from "@/lib/utils";
-
-const navItems = [
-  { href: "/home", label: "Accueil" },
-  { href: "/swipe", label: "Swipe" },
-  { href: "/search", label: "Rechercher" },
-  { href: "/list", label: "Ma liste" },
-];
+import { isNavActive, navItems } from "./navItems";
 
 export function TopNav() {
   const pathname = usePathname();
   const [hidden, setHidden] = useState(false);
+  const hiddenRef = useRef(false);
 
   useEffect(() => {
     let lastY = window.scrollY;
     function onScroll() {
       const y = window.scrollY;
-      setHidden(y > lastY && y > 80);
+      const next = y > lastY && y > 80;
       lastY = y;
+      if (next !== hiddenRef.current) {
+        hiddenRef.current = next;
+        setHidden(next);
+      }
     }
     window.addEventListener("scroll", onScroll, { passive: true });
     return () => window.removeEventListener("scroll", onScroll);
@@ -44,7 +43,7 @@ export function TopNav() {
 
         <nav className="hidden items-center gap-1 md:flex">
           {navItems.map((item) => {
-            const active = pathname === item.href;
+            const active = isNavActive(pathname, item.href);
             return (
               <Link
                 key={item.href}

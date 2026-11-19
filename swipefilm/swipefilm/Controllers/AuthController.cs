@@ -158,9 +158,7 @@ namespace swipefilm.Controllers
             {
                 using var http = new HttpClient();
                 http.DefaultRequestHeaders.TryAddWithoutValidation(
-                    "Authorization",
-                    "MediaBrowser Client=\"SwipeFilm\", Device=\"API\", DeviceId=\"swipefilm\", Version=\"1.0.0\""
-                );
+                    "Authorization", JellyfinHttp.AuthHeader(null));
 
                 var response = await http.PostAsJsonAsync(
                     $"{url}/Users/AuthenticateByName",
@@ -178,10 +176,7 @@ namespace swipefilm.Controllers
                 var (url, _) = _config.GetServerCredentials();
                 using var http = new HttpClient();
                 http.DefaultRequestHeaders.TryAddWithoutValidation(
-                    "Authorization",
-                    $"MediaBrowser Client=\"SwipeFilm\", Device=\"API\", " +
-                    $"DeviceId=\"BOT_swipefilm_{username}\", Version=\"1.0.0\""
-                );
+                    "Authorization", JellyfinHttp.AuthHeader(null, $"BOT_swipefilm_{username}"));
 
                 var response = await http.PostAsJsonAsync(
                     $"{url}/Users/AuthenticateByName",
@@ -214,7 +209,7 @@ namespace swipefilm.Controllers
 
                 // Récupère les détails du user depuis l'API admin Jellyfin
                 var response = await JellyfinHttp.GetAsync(http, 
-                    $"{url}/Users/{jellyfinUserId}?api_key={apiKey}");
+                    $"{url}/Users/{jellyfinUserId}", apiKey);
 
                 if (!response.IsSuccessStatusCode) return null;
 
@@ -265,7 +260,7 @@ namespace swipefilm.Controllers
             {
                 using var http = new HttpClient();
                 var response = await JellyfinHttp.GetAsync(http, 
-                    $"{url}/System/Configuration?api_key={apiKey}");
+                    $"{url}/System/Configuration", apiKey);
 
                 if (!response.IsSuccessStatusCode)
                     return ("en", "US"); // ✅ fallback sécurisé
