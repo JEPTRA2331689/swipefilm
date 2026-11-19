@@ -54,8 +54,34 @@ namespace swipefilm.Auth
             var requestService = scope.ServiceProvider.GetRequiredService<MediaRequestService>();
             await requestService.ConfirmAvailabilityAsync();
 
+            await RebuildProfilesAsync(scope, db);
+
             _logger.LogInformation(
                 "[Hangfire] Sync terminée pour {Name}", server.FriendlyName);
+        }
+
+        // L'historique vient d'être réimporté : sans recalcul, seuls les nouveaux comptes
+        // (onboarding) avaient un profil, les autres restaient vides.
+        private async Task RebuildProfilesAsync(IServiceScope scope, AppDbContext db)
+        {
+            var engine = scope.ServiceProvider.GetRequiredService<RecommendationEngine>();
+            var userIds = await db.Users.AsNoTracking()
+                .Where(u => !u.IsGuest)
+                .Select(u => u.Id)
+                .ToListAsync();
+
+            foreach (var userId in userIds)
+            {
+                try
+                {
+                    await engine.UpdateProfileFromHistoryAsync(userId);
+                    await engine.UpdateSeriesProfileFromHistoryAsync(userId);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning(ex, "[Hangfire] Recalcul du profil échoué pour {UserId}", userId);
+                }
+            }
         }
 
         /// <summary>
@@ -66,13 +92,10 @@ namespace swipefilm.Auth
         /// </summary>
         public async Task OnboardNewUserAsync(Guid userId)
         {
+            // La sync recalcule déjà le profil de tous les utilisateurs.
             await SyncSingleServerAsync();
 
             using var scope = _services.CreateScope();
-            var engine = scope.ServiceProvider.GetRequiredService<RecommendationEngine>();
-            await engine.UpdateProfileFromHistoryAsync(userId);
-            await engine.UpdateSeriesProfileFromHistoryAsync(userId);
-
             var discovery = scope.ServiceProvider.GetRequiredService<PersonalizedDiscoveryService>();
             await discovery.DiscoverForUserAsync(userId);
 
